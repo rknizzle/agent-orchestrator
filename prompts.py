@@ -3,6 +3,29 @@ def get_prompt_for_status(target_status: str, task: dict) -> str:
     title = task.get('issue_title', '')
     body = task.get('issue_body', '')
     comments_text = "\n\n".join(task.get('issue_comments', [])) if task.get('issue_comments') else "No comments found."
+    labels = task.get('issue_labels', [])
+    
+    is_simple = "[SIMPLE]" in title or "[SIMPLE]" in body or "ai-simple" in labels
+
+    if target_status == "AI BRAINSTORM":
+        return f"""
+You are a senior technical architect. The user has a vague idea for a new feature or change, but it isn't fully defined yet.
+Your job is to explore the codebase and brainstorm high-level implementation strategies.
+
+TASK TITLE: {title}
+TASK BODY:
+{body}
+
+INSTRUCTIONS:
+1. USE YOUR TOOLS to explore the current architecture. Identify which modules, data models, or services might be affected by this vague idea.
+2. Brainstorm 2-3 different high-level approaches for how this could be implemented.
+3. For each approach, list the pros, cons, and any potential technical hurdles.
+4. Identify what specific information is currently missing that would be required to turn this into a concrete "AI TODO" ticket.
+5. Wrap your architectural brainstorming document exactly in <COMMENT>...</COMMENT> tags.
+6. End your entire response exactly with this tag: <NEXT_STATE>AI BRAINSTORMING DONE</NEXT_STATE>
+
+Remember: You are not writing code or a detailed plan yet. You are helping the user refine a vague idea into a solid specification.
+"""
 
     if target_status == "AI TODO":
         return f"""
@@ -13,10 +36,13 @@ TASK TITLE: {title}
 TASK BODY:
 {body}
 
+RECENT COMMENTS (May contain brainstorming results or your specific implementation choice):
+{comments_text}
+
 INSTRUCTIONS:
 1. USE YOUR TOOLS to explore the local codebase. Search for relevant files, read how the current system works, and determine how this task fits into the existing architecture.
 2. DO NOT modify any files yet. Only research and analyze.
-3. CHECK FOR FAST TRACK: If the task title or body contains the string "[SIMPLE]", and you are 100% confident you understand the fix and it requires minimal changes:
+3. CHECK FOR FAST TRACK: If {'the requirements are clear and the task is marked as simple (the "ai-simple" label is present)' if is_simple else 'the task title or body contains the string "[SIMPLE]"'}, and you are 100% confident you understand the fix and it requires minimal changes:
    - IMPLEMENT the code immediately in the current worktree.
    - Run relevant tests to validate your changes.
    - Commit and push your changes.
@@ -48,7 +74,7 @@ RECENT COMMENTS (Including User Answers):
 
 INSTRUCTIONS:
 1. USE YOUR TOOLS to explore the local codebase if you need to double-check anything based on the user's answers.
-2. CHECK FOR FAST TRACK: If the task title or body contains the string "[SIMPLE]", and you are now 100% confident you understand the fix:
+2. CHECK FOR FAST TRACK: If {'the requirements are clear and the task is marked as simple (the "ai-simple" label is present)' if is_simple else 'the task title or body contains the string "[SIMPLE]"'}, and you are now 100% confident you understand the fix:
    - IMPLEMENT the code immediately in the current worktree.
    - Run relevant tests to validate your changes.
    - Commit and push your changes.
@@ -108,7 +134,7 @@ INSTRUCTIONS:
     elif target_status == "AI PR REVIEW FEEDBACK":
         return f"""
 You are a senior software engineer. You previously created a Pull Request to implement this task.
-The user has reviewed the PR and provided feedback.
+The user or a reviewer has provided feedback.
 You are already working inside a dedicated git worktree on the correct branch for this PR.
 
 TASK TITLE: {title}
@@ -128,16 +154,45 @@ INSTRUCTIONS:
    - You MUST end your entire response exactly with this tag: <NEXT_STATE>AI PR READY</NEXT_STATE>
 """
 
+    elif target_status == "AI REVIEWING PR":
+        return f"""
+You are a senior QA Engineer and Code Reviewer. Your job is to review a Pull Request created by another AI agent.
+Be highly critical. Ensure the code is robust, follows best practices, and completely satisfies the original requirements.
+
+TASK TITLE: {title}
+TASK BODY:
+{body}
+
+RECENT ISSUE COMMENTS (Contains the PR link and implementation summary):
+{comments_text}
+
+INSTRUCTIONS:
+1. USE YOUR TOOLS to find the open Pull Request for this issue (use `gh pr list` or `gh pr view`).
+2. USE YOUR TOOLS to view the diff of the Pull Request (use `gh pr diff`).
+3. USE YOUR TOOLS to explore the codebase and ensure the changes are correct and don't break existing logic.
+4. Run the project's tests to ensure the PR is stable.
+5. If you find ANY issues (bugs, missing tests, code style violations, or requirements not met):
+   - List your feedback clearly.
+   - Wrap your feedback in <COMMENT>...</COMMENT> tags.
+   - End your response with: <NEXT_STATE>AI PR REVIEW FEEDBACK</NEXT_STATE>
+6. If the PR is perfect and you are ready for a human to merge it:
+   - Provide a brief "LGTM" (Looks Good To Me) summary.
+   - Wrap your summary in <COMMENT>...</COMMENT> tags.
+   - End your response with: <NEXT_STATE>AI PR READY</NEXT_STATE>
+"""
+
     else:
         raise NotImplementedError(f"Prompt logic for {target_status} is not yet implemented.")
 
 def get_default_state_for_status(target_status: str) -> str:
     """Returns the default fallback state if parsing fails based on the target status."""
     defaults = {
+        "AI BRAINSTORM": "AI BRAINSTORMING DONE",
         "AI TODO": "AI TODO",
         "AI FOLLOW UP QUESTIONS ANSWERED": "AI PLAN NEEDS REVIEW",
         "AI PLAN FEEDBACK": "AI PLAN NEEDS REVIEW",
-        "AI READY TO IMPLEMENT": "AI PR READY",
+        "AI READY TO IMPLEMENT": "AI READY TO IMPLEMENT",
+        "AI REVIEWING PR": "AI REVIEWING PR",
         "AI PR REVIEW FEEDBACK": "AI PR READY"
     }
     return defaults.get(target_status, "AI TODO")

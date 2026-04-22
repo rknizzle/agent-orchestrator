@@ -13,10 +13,12 @@ load_dotenv()
 
 # Valid trigger statuses from the plan
 VALID_STATUSES = [
+    "AI BRAINSTORM",
     "AI TODO",
     "AI FOLLOW UP QUESTIONS ANSWERED",
     "AI PLAN FEEDBACK",
     "AI READY TO IMPLEMENT",
+    "AI REVIEWING PR",
     "AI PR REVIEW FEEDBACK"
 ]
 
@@ -92,11 +94,14 @@ def run_orchestration_loop(gh_client, task, target_status, repo_path):
         if target_status == "AI PR REVIEW FEEDBACK":
             # For review feedback, the PR already exists, so we just post a comment to it
             post_pr_comment(repo_path, task['issue_number'], f"**🤖 Posted by Agent Orchestrator:**\n\n{agent_comment}")
+            # Move to review state after addressing feedback
+            next_status = "AI REVIEWING PR"
         else:
-            # For all other states (AI TODO, AI READY TO IMPLEMENT, etc.), create a new PR
+            # For initial implementation, create PR and move to automated review
             pr_url = create_pull_request(repo_path, task['issue_title'], task['issue_number'], pr_description=agent_comment)
             if pr_url:
                 agent_comment += f"\n\n**Pull Request:** {pr_url}"
+                next_status = "AI REVIEWING PR"
             else:
                 agent_comment += "\n\n*(Failed to automatically generate Pull Request link. Please check the branch manually.)*"
 

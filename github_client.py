@@ -91,6 +91,11 @@ class GitHubClient:
                       repository {
                         nameWithOwner
                       }
+                      labels(first: 10) {
+                        nodes {
+                          name
+                        }
+                      }
                       comments(last: 10) {
                         nodes {
                           author {
@@ -123,12 +128,15 @@ class GitHubClient:
                         author = comment_node.get("author", {}).get("login", "Unknown") if comment_node.get("author") else "Unknown"
                         comments.append(f"@{author}:\n{comment_node['body']}")
 
+                    labels = [label["name"] for label in content.get("labels", {}).get("nodes", []) if label]
+
                     return {
                         "project_item_id": item["id"],
                         "issue_node_id": content["id"],
                         "issue_title": content["title"],
                         "issue_body": content["body"],
                         "issue_comments": comments,
+                        "issue_labels": labels,
                         "issue_url": content["url"],
                         "issue_number": content["number"],
                         "repo_name": content["repository"]["nameWithOwner"]

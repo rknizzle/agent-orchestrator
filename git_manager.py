@@ -1,8 +1,10 @@
 import os
 import subprocess
+import shutil
+import glob
 
 def setup_worktree(repo_path: str, issue_number: int) -> str:
-    """Creates a git worktree for the specific issue."""
+    """Creates a git worktree for the specific issue and syncs necessary untracked files."""
     worktrees_dir = f"{os.path.abspath(repo_path)}-worktrees"
     os.makedirs(worktrees_dir, exist_ok=True)
     worktree_path = os.path.join(worktrees_dir, f"issue-{issue_number}")
@@ -19,33 +21,81 @@ def setup_worktree(repo_path: str, issue_number: int) -> str:
     except subprocess.CalledProcessError:
         branch_exists = False
 
-    print("[*] Ensuring main repository is on the latest default branch...")
+    print("[*] Fetching latest changes from origin...")
     try:
-        # Try to checkout main or master
+        subprocess.run(["git", "fetch", "origin"], cwd=repo_path, capture_output=True, check=True)
+        
+        # Determine the remote default branch (try main then master)
         try:
-            subprocess.run(["git", "checkout", "main"], cwd=repo_path, capture_output=True, check=True)
-            default_branch = "main"
+            subprocess.run(["git", "rev-parse", "--verify", "origin/main"], cwd=repo_path, capture_output=True, check=True)
+            remote_base = "origin/main"
+            local_default = "main"
         except subprocess.CalledProcessError:
-            subprocess.run(["git", "checkout", "master"], cwd=repo_path, capture_output=True, check=True)
-            default_branch = "master"
-            
-        # Pull the latest changes
-        subprocess.run(["git", "pull", "origin", default_branch], cwd=repo_path, capture_output=True, check=True)
-        print(f"[*] Successfully updated '{default_branch}' to the latest commit.")
+            subprocess.run(["git", "rev-parse", "--verify", "origin/master"], cwd=repo_path, capture_output=True, check=True)
+            remote_base = "origin/master"
+            local_default = "master"
+
+        # If the branch is currently checked out in the main repo, git worktree add will fail.
+        # Switch main repo away from the branch if needed.
+        current_branch = subprocess.run(["git", "branch", "--show-current"], cwd=repo_path, capture_output=True, text=True, check=True).stdout.strip()
+        if current_branch == branch_name:
+            print(f"[*] Branch {branch_name} is checked out in the main repo. Switching main repo to '{local_default}'...")
+            subprocess.run(["git", "checkout", local_default], cwd=repo_path, capture_output=True, check=True)
+
     except subprocess.CalledProcessError as e:
-        print(f"[!] Warning: Could not update main repository. It may have uncommitted changes or be offline.")
+        print(f"[!] Warning: Could not fetch or determine remote base. Proceeding with local state.")
+        remote_base = "HEAD" # Fallback
 
     print(f"[*] Creating git worktree at {worktree_path} for branch {branch_name}...")
     try:
         if branch_exists:
+            # If it exists, just add the worktree for that branch
             subprocess.run(["git", "worktree", "add", worktree_path, branch_name], cwd=repo_path, check=True)
         else:
-            subprocess.run(["git", "worktree", "add", "-b", branch_name, worktree_path], cwd=repo_path, check=True)
+            # If NEW, create branch explicitly from the latest remote state
+            print(f"[*] Starting new branch from {remote_base}...")
+            subprocess.run(["git", "worktree", "add", "-b", branch_name, worktree_path, remote_base], cwd=repo_path, check=True)
     except subprocess.CalledProcessError as e:
         print(f"[!] Failed to create worktree: {e}")
         raise
 
+    # Sync untracked files/directories to the worktree
+    sync_untracked_files(repo_path, worktree_path)
+
     return worktree_path
+
+def sync_untracked_files(repo_path: str, worktree_path: str):
+    """
+    Copies untracked/ignored files from the main repo to the worktree.
+    Uses .orchestrator-include if it exists, otherwise defaults to .env*
+    """
+    include_file = os.path.join(repo_path, ".orchestrator-include")
+    patterns = [".env*"] # Default pattern
+    
+    if os.path.exists(include_file):
+        print(f"[*] Found .orchestrator-include. Parsing patterns...")
+        with open(include_file, "r") as f:
+            patterns = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+    
+    for pattern in patterns:
+        source_matches = glob.glob(os.path.join(repo_path, pattern))
+        for source in source_matches:
+            # Calculate relative path to maintain directory structure if necessary
+            rel_path = os.path.relpath(source, repo_path)
+            destination = os.path.join(worktree_path, rel_path)
+            
+            try:
+                if os.path.isdir(source):
+                    if os.path.exists(destination):
+                        shutil.rmtree(destination)
+                    shutil.copytree(source, destination)
+                    print(f"[*] Synced directory: {rel_path}")
+                else:
+                    os.makedirs(os.path.dirname(destination), exist_ok=True)
+                    shutil.copy2(source, destination)
+                    print(f"[*] Synced file: {rel_path}")
+            except Exception as e:
+                print(f"[!] Failed to sync {rel_path}: {e}")
 
 def cleanup_worktree(repo_path: str, worktree_path: str):
     """Removes the git worktree."""

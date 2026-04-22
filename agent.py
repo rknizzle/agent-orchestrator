@@ -11,6 +11,7 @@ def run_gemini_cli(prompt: str, cwd: str = None) -> str:
         [
             "gemini", 
             "-p", prompt, 
+            "--model", "auto",
             "--yolo",
             "--policy", os.path.join(os.path.dirname(os.path.abspath(__file__)), "orchestrator-policy.yaml")
         ],
