@@ -71,7 +71,13 @@ def show_board():
     valid_items = []
     for item in items:
         if not item or not item.get("content"): continue
-        status = item.get("fieldValueByName", {}).get("name", "No Status") if item.get("fieldValueByName") else "No Status"
+        
+        # Skip items that have no status
+        status_value = item.get("fieldValueByName")
+        if not status_value:
+            continue
+            
+        status = status_value.get("name", "No Status")
         content = item["content"]
         valid_items.append({
             "number": content["number"],

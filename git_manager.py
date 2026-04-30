@@ -3,12 +3,11 @@ import subprocess
 import shutil
 import glob
 
-def setup_worktree(repo_path: str, issue_number: int) -> str:
-    """Creates a git worktree for the specific issue and syncs necessary untracked files."""
+def setup_worktree(repo_path: str, branch_name: str) -> str:
+    """Creates a git worktree for the specific branch and syncs necessary untracked files."""
     worktrees_dir = f"{os.path.abspath(repo_path)}-worktrees"
     os.makedirs(worktrees_dir, exist_ok=True)
-    worktree_path = os.path.join(worktrees_dir, f"issue-{issue_number}")
-    branch_name = f"issue-{issue_number}"
+    worktree_path = os.path.join(worktrees_dir, branch_name)
     
     if os.path.exists(worktree_path):
         print(f"[*] Worktree already exists at {worktree_path}")
@@ -105,9 +104,8 @@ def cleanup_worktree(repo_path: str, worktree_path: str):
     except subprocess.CalledProcessError as e:
         print(f"[!] Failed to remove worktree: {e}")
 
-def create_pull_request(repo_path: str, issue_title: str, issue_number: int, repo_name: str = None, pr_description: str = "") -> str:
+def create_pull_request(repo_path: str, issue_title: str, issue_number: int, branch_name: str, repo_name: str = None, pr_description: str = "") -> str:
     """Uses the GitHub CLI to create a Pull Request from the issue's branch."""
-    branch_name = f"issue-{issue_number}"
     print(f"[*] Creating Pull Request for branch {branch_name}...")
     
     # Use fully qualified issue reference if repo_name is provided
@@ -146,9 +144,8 @@ def create_pull_request(repo_path: str, issue_title: str, issue_number: int, rep
         print(f"[!] Failed to create PR: {e.stderr}")
         return None
 
-def post_pr_comment(repo_path: str, issue_number: int, comment: str):
-    """Uses the GitHub CLI to post a comment on the Pull Request associated with the issue branch."""
-    branch_name = f"issue-{issue_number}"
+def post_pr_comment(repo_path: str, branch_name: str, comment: str):
+    """Uses the GitHub CLI to post a comment on the Pull Request associated with the branch."""
     print(f"[*] Posting comment to PR for branch {branch_name}...")
     
     try:

@@ -74,9 +74,14 @@ class GitHubClient:
               items(first: 100) {
                 nodes {
                   id
-                  fieldValueByName(name: "Status") {
+                  status: fieldValueByName(name: "Status") {
                     ... on ProjectV2ItemFieldSingleSelectValue {
                       name
+                    }
+                  }
+                  branch: fieldValueByName(name: "Branch") {
+                    ... on ProjectV2ItemFieldTextValue {
+                      text
                     }
                   }
                   content {
@@ -117,8 +122,8 @@ class GitHubClient:
         for item in items:
             if not item: continue
             
-            status_value = item.get("fieldValueByName")
-            if status_value and status_value.get("name") in valid_statuses:
+            status_node = item.get("status")
+            if status_node and status_node.get("name") in valid_statuses:
                 content = item.get("content")
                 if content:
                     comments = []
@@ -128,6 +133,11 @@ class GitHubClient:
                         comments.append(f"@{author}:\n{comment_node['body']}")
 
                     labels = [label["name"] for label in content.get("labels", {}).get("nodes", []) if label]
+
+                    # Use custom Branch field if provided, otherwise default to issue number
+                    branch_node = item.get("branch")
+                    custom_branch = branch_node.get("text") if branch_node else None
+                    branch_name = custom_branch if custom_branch else f"issue-{content['number']}"
 
                     actionable_tasks.append({
                         "project_item_id": item["id"],
@@ -139,7 +149,8 @@ class GitHubClient:
                         "issue_url": content["url"],
                         "issue_number": content["number"],
                         "repo_name": content["repository"]["nameWithOwner"],
-                        "current_status": status_value.get("name")
+                        "current_status": status_node.get("name"),
+                        "branch_name": branch_name
                     })
         return actionable_tasks
 

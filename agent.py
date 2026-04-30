@@ -3,18 +3,45 @@ import re
 import os
 from prompts import get_prompt_for_status, get_default_state_for_status
 
-def run_gemini_cli(prompt: str, cwd: str = None, prefix: str = "") -> str:
-    """Runs the gemini CLI with the given prompt, streams stdout to console, and returns the full output."""
-    print(f"{prefix}[*] Invoking Gemini CLI... (cwd: {cwd or 'current directory'})")
+import subprocess
+import re
+import os
+from prompts import get_prompt_for_status, get_default_state_for_status
+
+def run_agent_cli(agent_type: str, prompt: str, cwd: str = None, prefix: str = "") -> str:
+    """Runs the selected agent CLI with the given prompt."""
+    print(f"{prefix}[*] Invoking {agent_type.capitalize()} CLI... (cwd: {cwd or 'current directory'})")
     
-    process = subprocess.Popen(
-        [
+    policy_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "orchestrator-policy.yaml")
+    
+    if agent_type == "gemini":
+        cmd = [
             "gemini", 
             "-p", prompt, 
             "--model", "auto",
             "--yolo",
-            "--policy", os.path.join(os.path.dirname(os.path.abspath(__file__)), "orchestrator-policy.yaml")
-        ],
+            "--policy", policy_path
+        ]
+    elif agent_type == "claude":
+        # Claude Code non-interactive usage
+        cmd = [
+            "claude", 
+            "-p", prompt,
+            "--bare",
+            "--allowedTools", "Bash,Read,Edit"
+        ]
+    elif agent_type == "cursor-agent" or agent_type == "agent":
+        # Assume cursor-agent/agent tool follows a similar non-interactive pattern
+        cmd = [
+            agent_type,
+            "-p", prompt,
+            "--yolo" # Common flag for auto-approval in these types of tools
+        ]
+    else:
+        raise ValueError(f"Unknown agent type: {agent_type}")
+
+    process = subprocess.Popen(
+        cmd,
         cwd=cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -34,8 +61,8 @@ def run_gemini_cli(prompt: str, cwd: str = None, prefix: str = "") -> str:
     full_output = "".join(output).strip()
     
     if return_code != 0:
-        print(f"{prefix}[!] Gemini CLI failed with exit code {return_code}")
-        raise subprocess.CalledProcessError(return_code, ["gemini", prompt], output=full_output)
+        print(f"{prefix}[!] {agent_type.capitalize()} CLI failed with exit code {return_code}")
+        raise subprocess.CalledProcessError(return_code, cmd, output=full_output)
         
     return full_output
 
@@ -51,7 +78,7 @@ def parse_agent_response(output_text: str, default_state: str, prefix: str = "")
     if state_match:
         next_state = state_match.group(1).strip()
     else:
-        print(f"{prefix}[!] Warning: Could not find <NEXT_STATE> tag in Gemini output.")
+        print(f"{prefix}[!] Warning: Could not find <NEXT_STATE> tag in agent output.")
         next_state = default_state
         success = False
 
@@ -60,16 +87,16 @@ def parse_agent_response(output_text: str, default_state: str, prefix: str = "")
     if comment_match:
         clean_comment = comment_match.group(1).strip()
     else:
-        print(f"{prefix}[!] Warning: Could not find <COMMENT> tag in Gemini output.")
+        print(f"{prefix}[!] Warning: Could not find <COMMENT> tag in agent output.")
         # Fallback: just strip the state tag and return everything else
         clean_comment = re.sub(r"<NEXT_STATE>.*?</NEXT_STATE>", "", output_text, flags=re.IGNORECASE | re.DOTALL).strip()
         success = False
 
     return next_state, clean_comment, success
 
-def process_task(target_status: str, task: dict, cwd: str = None, max_retries: int = 2, prefix: str = "") -> tuple[str, str]:
+def process_task(target_status: str, task: dict, agent_type: str = "gemini", cwd: str = None, max_retries: int = 2, prefix: str = "") -> tuple[str, str]:
     """
-    Builds the prompt based on the current status, runs Gemini, and parses the result.
+    Builds the prompt based on the current status, runs the selected agent, and parses the result.
     If tags are missing, it retries up to max_retries times.
     Returns (next_status, comment_body_to_post).
     """
@@ -82,7 +109,7 @@ def process_task(target_status: str, task: dict, cwd: str = None, max_retries: i
         if attempt > 0:
             print(f"{prefix}[*] Retry Attempt {attempt}/{max_retries} due to missing tags...")
             
-        output = run_gemini_cli(current_prompt, cwd=cwd, prefix=prefix)
+        output = run_agent_cli(agent_type, current_prompt, cwd=cwd, prefix=prefix)
         next_state, clean_comment, success = parse_agent_response(output, default_state=default_state, prefix=prefix)
         
         if success:

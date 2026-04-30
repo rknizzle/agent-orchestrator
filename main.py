@@ -43,6 +43,12 @@ def parse_arguments():
         help="The local path to the target git repository."
     )
     parser.add_argument(
+        "--agent",
+        default=os.getenv("ORCHESTRATOR_AGENT", "gemini"),
+        choices=["gemini", "claude", "cursor-agent", "agent"],
+        help="The AI agent CLI to use (default: gemini or ORCHESTRATOR_AGENT env var)."
+    )
+    parser.add_argument(
         "--interval",
         type=int,
         default=60,
@@ -75,14 +81,15 @@ def print_agent_context(task, prefix):
             print(f"{prefix}{line}")
     print(f"{prefix}---------------------\n")
 
-def worker_main(task, target_status, repo_path, token, project_id, status_field_id):
+def worker_main(task, target_status, repo_path, token, project_id, status_field_id, agent_type):
     """Entry point for the worker process."""
     issue_num = task['issue_number']
+    branch_name = task['branch_name']
     prefix = f"[#{issue_num}] "
-    
+
     # Re-initialize client in the new process
     gh_client = GitHubClient(token, project_id, status_field_id)
-    
+
     print(f"{prefix}[*] Locking task by setting status to '{LOCKED_STATUS}'...")
     try:
         gh_client.update_item_status(task['project_item_id'], LOCKED_STATUS)
@@ -94,29 +101,30 @@ def worker_main(task, target_status, repo_path, token, project_id, status_field_
     print_agent_context(task, prefix)
 
     try:
-        worktree_path = setup_worktree(repo_path, issue_num)
+        worktree_path = setup_worktree(repo_path, branch_name)
     except Exception as e:
         print(f"{prefix}[!] Failed to set up worktree. Aborting agent execution.")
         return
 
     try:
-        print(f"{prefix}[*] Handing task over to Gemini CLI (cwd: {worktree_path})...")
-        next_status, agent_comment = process_task(target_status, task, cwd=worktree_path, prefix=prefix)
+        print(f"{prefix}[*] Handing task over to {agent_type} CLI (cwd: {worktree_path})...")
+        next_status, agent_comment = process_task(target_status, task, agent_type=agent_type, cwd=worktree_path, prefix=prefix)
     finally:
         cleanup_worktree(repo_path, worktree_path)
-    
+
     # Automatically handle PR creation if the agent completed the implementation
     if next_status == "AI PR READY":
         if target_status == "AI PR REVIEW FEEDBACK":
-            post_pr_comment(repo_path, issue_num, f"**🤖 Posted by Agent Orchestrator:**\n\n{agent_comment}")
+            post_pr_comment(repo_path, branch_name, f"**🤖 Posted by Agent Orchestrator:**\n\n{agent_comment}")
             next_status = "AI REVIEWING PR"
         else:
-            pr_url = create_pull_request(repo_path, task['issue_title'], issue_num, repo_name=task['repo_name'], pr_description=agent_comment)
+            pr_url = create_pull_request(repo_path, task['issue_title'], issue_num, branch_name, repo_name=task['repo_name'], pr_description=agent_comment)
             if pr_url:
                 agent_comment += f"\n\n**Pull Request:** {pr_url}"
                 next_status = "AI REVIEWING PR"
             else:
                 agent_comment += "\n\n*(Failed to automatically generate Pull Request link. Please check the branch manually.)*"
+
 
     print(f"{prefix}\n--- Agent Response ---")
     for line in agent_comment.split('\n'):
@@ -190,7 +198,7 @@ def main():
                     print(f"[*] Found actionable task: #{issue_num} in state '{current_status}'")
                     p = multiprocessing.Process(
                         target=worker_main,
-                        args=(task, current_status, repo_path, token, project_id, status_field_id)
+                        args=(task, current_status, repo_path, token, project_id, status_field_id, args.agent)
                     )
                     p.start()
                     active_tasks[issue_num] = p
