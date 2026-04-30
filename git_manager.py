@@ -105,12 +105,14 @@ def cleanup_worktree(repo_path: str, worktree_path: str):
     except subprocess.CalledProcessError as e:
         print(f"[!] Failed to remove worktree: {e}")
 
-def create_pull_request(repo_path: str, issue_title: str, issue_number: int, pr_description: str = "") -> str:
+def create_pull_request(repo_path: str, issue_title: str, issue_number: int, repo_name: str = None, pr_description: str = "") -> str:
     """Uses the GitHub CLI to create a Pull Request from the issue's branch."""
     branch_name = f"issue-{issue_number}"
     print(f"[*] Creating Pull Request for branch {branch_name}...")
     
-    body = f"Resolves #{issue_number}\n\n"
+    # Use fully qualified issue reference if repo_name is provided
+    issue_ref = f"{repo_name}#{issue_number}" if repo_name else f"#{issue_number}"
+    body = f"Resolves {issue_ref}\n\n"
     if pr_description:
         body += f"### Agent Summary:\n{pr_description}"
     

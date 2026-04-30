@@ -65,10 +65,8 @@ class GitHubClient:
             
         return status_map
 
-    def get_first_item_by_status(self, target_status: str):
-        """Fetches the first project item that has the target status."""
-        # Note: GitHub GraphQL doesn't natively support filtering ProjectV2 items by custom field yet.
-        # We fetch the first 100 items and filter locally.
+    def get_all_actionable_tasks(self, valid_statuses: list[str]):
+        """Fetches all project items that have one of the valid statuses."""
         query = """
         query($projectId: ID!) {
           node(id: $projectId) {
@@ -115,13 +113,14 @@ class GitHubClient:
         data = self._run_query(query, {"projectId": self.project_id})
         items = data.get("data", {}).get("node", {}).get("items", {}).get("nodes", [])
         
+        actionable_tasks = []
         for item in items:
             if not item: continue
             
             status_value = item.get("fieldValueByName")
-            if status_value and status_value.get("name") == target_status:
+            if status_value and status_value.get("name") in valid_statuses:
                 content = item.get("content")
-                if content: # Ensure it's an Issue and not a Draft Issue
+                if content:
                     comments = []
                     for comment_node in content.get("comments", {}).get("nodes", []):
                         if not comment_node: continue
@@ -130,7 +129,7 @@ class GitHubClient:
 
                     labels = [label["name"] for label in content.get("labels", {}).get("nodes", []) if label]
 
-                    return {
+                    actionable_tasks.append({
                         "project_item_id": item["id"],
                         "issue_node_id": content["id"],
                         "issue_title": content["title"],
@@ -139,9 +138,10 @@ class GitHubClient:
                         "issue_labels": labels,
                         "issue_url": content["url"],
                         "issue_number": content["number"],
-                        "repo_name": content["repository"]["nameWithOwner"]
-                    }
-        return None
+                        "repo_name": content["repository"]["nameWithOwner"],
+                        "current_status": status_value.get("name")
+                    })
+        return actionable_tasks
 
     def update_item_status(self, project_item_id: str, new_status_name: str):
         """Updates the status of a project item."""
