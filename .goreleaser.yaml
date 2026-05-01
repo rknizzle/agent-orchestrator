@@ -1,0 +1,50 @@
+# .goreleaser.yaml
+# Documentation at https://goreleaser.com
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    main: ./cmd/orchestrator/main.go
+    binary: orchestrator
+
+archives:
+  - format: tar.gz
+    # this name template makes the output look like: orchestrator_Darwin_arm64.tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+    
+    # Files to include in the release archive besides the binary
+    files:
+      - orchestrator-policy.yaml
+      - .env.example
+      - README.md
+      - note.md
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
