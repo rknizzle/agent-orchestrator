@@ -7,6 +7,11 @@ def get_prompt_for_status(target_status: str, task: dict) -> str:
     
     is_simple = "[SIMPLE]" in title or "[SIMPLE]" in body or "ai-simple" in labels
 
+    # Identify related repos for context gathering
+    related_repo_msg = ""
+    if "repo:" in body:
+        related_repo_msg = "\nNOTE: This task mentions related repositories (e.g., 'repo:name'). If you need to gather context from these other local codebases, use your tools to explore those paths. If your environment has a REPOS_ROOT defined, you can find them there.\n"
+
     if target_status == "AI BRAINSTORM":
         return f"""
 You are a senior technical architect. The user has a vague idea for a new feature or change, but it isn't fully defined yet.
@@ -15,6 +20,7 @@ Your job is to explore the codebase and brainstorm high-level implementation str
 TASK TITLE: {title}
 TASK BODY:
 {body}
+{related_repo_msg}
 
 INSTRUCTIONS:
 1. USE YOUR TOOLS to explore the current architecture. Identify which modules, data models, or services might be affected by this vague idea.
@@ -35,6 +41,7 @@ Your job is to evaluate if the requirements are clear enough to begin creating a
 TASK TITLE: {title}
 TASK BODY:
 {body}
+{related_repo_msg}
 
 RECENT COMMENTS (May contain brainstorming results or your specific implementation choice):
 {comments_text}
@@ -68,6 +75,7 @@ The user has now answered your questions in the issue comments.
 TASK TITLE: {title}
 TASK BODY:
 {body}
+{related_repo_msg}
 
 RECENT COMMENTS (Including User Answers):
 {comments_text}
@@ -98,6 +106,7 @@ The user has reviewed your plan and provided feedback in the comments.
 TASK TITLE: {title}
 TASK BODY:
 {body}
+{related_repo_msg}
 
 RECENT COMMENTS (Including User Feedback):
 {comments_text}
@@ -117,6 +126,7 @@ You are already working inside a dedicated git worktree on the correct branch fo
 TASK TITLE: {title}
 TASK BODY:
 {body}
+{related_repo_msg}
 
 RECENT COMMENTS (Contains the approved plan and any final user notes):
 {comments_text}
@@ -140,6 +150,7 @@ You are already working inside a dedicated git worktree on the correct branch fo
 TASK TITLE: {title}
 TASK BODY:
 {body}
+{related_repo_msg}
 
 RECENT ISSUE COMMENTS (May contain the PR link and user feedback):
 {comments_text}
@@ -162,6 +173,7 @@ Be highly critical. Ensure the code is robust, follows best practices, and compl
 TASK TITLE: {title}
 TASK BODY:
 {body}
+{related_repo_msg}
 
 RECENT ISSUE COMMENTS (Contains the PR link and implementation summary):
 {comments_text}

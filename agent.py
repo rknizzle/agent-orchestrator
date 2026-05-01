@@ -31,11 +31,10 @@ def run_agent_cli(agent_type: str, prompt: str, cwd: str = None, prefix: str = "
             "--allowedTools", "Bash,Read,Edit"
         ]
     elif agent_type == "cursor-agent" or agent_type == "agent":
-        # Assume cursor-agent/agent tool follows a similar non-interactive pattern
         cmd = [
             agent_type,
             "-p", prompt,
-            "--yolo" # Common flag for auto-approval in these types of tools
+            "--yolo"
         ]
     else:
         raise ValueError(f"Unknown agent type: {agent_type}")

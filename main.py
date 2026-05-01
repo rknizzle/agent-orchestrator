@@ -3,11 +3,13 @@ import os
 import sys
 import time
 import multiprocessing
+import re
 from dotenv import load_dotenv
 
 from github_client import GitHubClient
 from agent import process_task
 from git_manager import setup_worktree, cleanup_worktree, create_pull_request, post_pr_comment
+from config_manager import ConfigManager
 
 # Load environment variables from .env file
 load_dotenv()
@@ -44,9 +46,8 @@ def parse_arguments():
     )
     parser.add_argument(
         "--agent",
-        default=os.getenv("ORCHESTRATOR_AGENT", "gemini"),
         choices=["gemini", "claude", "cursor-agent", "agent"],
-        help="The AI agent CLI to use (default: gemini or ORCHESTRATOR_AGENT env var)."
+        help="The AI agent CLI to use (overrides config)."
     )
     parser.add_argument(
         "--interval",
@@ -81,7 +82,7 @@ def print_agent_context(task, prefix):
             print(f"{prefix}{line}")
     print(f"{prefix}---------------------\n")
 
-def worker_main(task, target_status, repo_path, token, project_id, status_field_id, agent_type):
+def worker_main(task, target_status, repo_path, token, project_id, status_field_id, agent_type, extra_patterns):
     """Entry point for the worker process."""
     issue_num = task['issue_number']
     branch_name = task['branch_name']
@@ -101,7 +102,7 @@ def worker_main(task, target_status, repo_path, token, project_id, status_field_
     print_agent_context(task, prefix)
 
     try:
-        worktree_path = setup_worktree(repo_path, branch_name)
+        worktree_path = setup_worktree(repo_path, branch_name, extra_patterns=extra_patterns)
     except Exception as e:
         print(f"{prefix}[!] Failed to set up worktree. Aborting agent execution.")
         return
@@ -162,9 +163,6 @@ def main():
         print(f"[!] Error: The path '{repo_path}' is not a valid git repository.", file=sys.stderr)
         sys.exit(1)
 
-    token, project_id, status_field_id = check_environment_variables()
-    gh_client = GitHubClient(token, project_id, status_field_id)
-
     print(f"[*] Starting Parallel GitHub Agent Orchestrator")
     print(f"[*] Target Repository: {repo_path}")
     if target_issue:
@@ -181,29 +179,46 @@ def main():
             for num in finished_issues:
                 del active_tasks[num]
 
-            # 2. Poll for actionable tasks
+            # 2. Re-load config in each poll to detect project changes
+            config_manager = ConfigManager(repo_path)
+            is_valid, missing = config_manager.validate_required()
+            if not is_valid:
+                print(f"[!] Missing configuration: {', '.join(missing)}")
+                print(f"[!] Please set them via .env, ~/.orchestrator/config.yaml, or orchestrator.yaml in the repo.")
+                time.sleep(interval)
+                continue
+
+            token = config_manager.get("GITHUB_TOKEN")
+            project_id = config_manager.get("GITHUB_PROJECT_ID")
+            status_field_id = config_manager.get("GITHUB_STATUS_FIELD_ID")
+            agent_type = args.agent or config_manager.get("ORCHESTRATOR_AGENT")
+
+            gh_client = GitHubClient(token, project_id, status_field_id)
+
+            # 3. Poll for actionable tasks
             statuses_to_check = [target_status] if target_status else VALID_STATUSES
             all_tasks = gh_client.get_all_actionable_tasks(statuses_to_check)
             
-            # 3. Filter by issue if requested
+            # 4. Filter by issue if requested
             if target_issue:
                 all_tasks = [t for t in all_tasks if t['issue_number'] == target_issue]
 
-            # 4. Spawn workers for new tasks
+            # 5. Spawn workers for new tasks
             for task in all_tasks:
                 issue_num = task['issue_number']
                 current_status = task['current_status']
                 
                 if issue_num not in active_tasks:
                     print(f"[*] Found actionable task: #{issue_num} in state '{current_status}'")
+                    includes = config_manager.get("INCLUDES", [])
                     p = multiprocessing.Process(
                         target=worker_main,
-                        args=(task, current_status, repo_path, token, project_id, status_field_id, args.agent)
+                        args=(task, current_status, repo_path, token, project_id, status_field_id, agent_type, includes)
                     )
                     p.start()
                     active_tasks[issue_num] = p
             
-            # 5. Sleep
+            # 6. Sleep
             if not active_tasks:
                 print(f"[*] No actionable tasks found. Sleeping for {interval} seconds...    ", end='\r')
             

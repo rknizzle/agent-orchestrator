@@ -3,7 +3,7 @@ import subprocess
 import shutil
 import glob
 
-def setup_worktree(repo_path: str, branch_name: str) -> str:
+def setup_worktree(repo_path: str, branch_name: str, extra_patterns: list[str] = None) -> str:
     """Creates a git worktree for the specific branch and syncs necessary untracked files."""
     worktrees_dir = f"{os.path.abspath(repo_path)}-worktrees"
     os.makedirs(worktrees_dir, exist_ok=True)
@@ -59,22 +59,22 @@ def setup_worktree(repo_path: str, branch_name: str) -> str:
         raise
 
     # Sync untracked files/directories to the worktree
-    sync_untracked_files(repo_path, worktree_path)
+    sync_untracked_files(repo_path, worktree_path, extra_patterns=extra_patterns)
 
     return worktree_path
 
-def sync_untracked_files(repo_path: str, worktree_path: str):
+def sync_untracked_files(repo_path: str, worktree_path: str, extra_patterns: list[str] = None):
     """
     Copies untracked/ignored files from the main repo to the worktree.
-    Uses .orchestrator-include if it exists, otherwise defaults to .env*
+    Uses extra_patterns (from central config), otherwise defaults to .env*
     """
-    include_file = os.path.join(repo_path, ".orchestrator-include")
-    patterns = [".env*"] # Default pattern
+    patterns = set(extra_patterns) if extra_patterns else set()
     
-    if os.path.exists(include_file):
-        print(f"[*] Found .orchestrator-include. Parsing patterns...")
-        with open(include_file, "r") as f:
-            patterns = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+    # Always include .env* if no patterns are provided at all
+    if not patterns:
+        patterns.add(".env*")
+    
+    print(f"[*] Syncing untracked files using patterns: {', '.join(patterns)}")
     
     for pattern in patterns:
         source_matches = glob.glob(os.path.join(repo_path, pattern))

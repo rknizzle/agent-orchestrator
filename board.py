@@ -2,30 +2,26 @@ import os
 import sys
 from dotenv import load_dotenv
 from github_client import GitHubClient
+from config_manager import ConfigManager
 
 # Load environment variables
 load_dotenv()
 
-def check_environment_variables():
-    token = os.getenv("GITHUB_TOKEN")
-    project_id = os.getenv("GITHUB_PROJECT_ID")
-    status_field_id = os.getenv("GITHUB_STATUS_FIELD_ID")
-
-    if not all([token, project_id, status_field_id]):
-        print("[!] Error: Missing required environment variables in .env")
-        sys.exit(1)
-        
-    return token, project_id, status_field_id
-
 def show_board():
-    token, project_id, status_field_id = check_environment_variables()
+    # Load config relative to current directory if not specified otherwise
+    config_manager = ConfigManager(".")
+    is_valid, missing = config_manager.validate_required()
+    if not is_valid:
+        print(f"[!] Missing configuration: {', '.join(missing)}")
+        sys.exit(1)
+
+    token = config_manager.get("GITHUB_TOKEN")
+    project_id = config_manager.get("GITHUB_PROJECT_ID")
+    status_field_id = config_manager.get("GITHUB_STATUS_FIELD_ID")
     
     print("[*] Fetching Project Board...")
     try:
         gh_client = GitHubClient(token, project_id, status_field_id)
-        # Fetch everything (actionable or not) to show a full board
-        # We'll use a wide list of statuses or just modify the client slightly
-        # For the board, we want to see EVERYTHING.
     except Exception as e:
         print(f"[!] Failed to initialize: {e}")
         sys.exit(1)
