@@ -64,7 +64,20 @@ func GetPromptForStatus(targetStatus string, task map[string]interface{}) string
 	case "AI TODO":
 		fileName = "todo.md"
 	case "AI FOLLOW UP QUESTIONS ANSWERED":
-		fileName = "follow_up.md"
+		// Determine if we came from Brainstorm or Todo
+		isBrainstorm := false
+		for _, comment := range comments {
+			if strings.Contains(strings.ToUpper(comment), "BRAINSTORM") {
+				isBrainstorm = true
+				break
+			}
+		}
+
+		if isBrainstorm {
+			fileName = "brainstorm.md"
+		} else {
+			fileName = "todo.md"
+		}
 	case "AI PLAN FEEDBACK":
 		fileName = "plan_feedback.md"
 	case "AI READY TO IMPLEMENT":
@@ -119,9 +132,9 @@ func executeTemplate(fileName string, data PromptData) string {
 
 func GetDefaultStateForStatus(targetStatus string) string {
 	defaults := map[string]string{
-		"AI BRAINSTORM":                   "AI BRAINSTORMING DONE",
-		"AI TODO":                         "AI TODO",
-		"AI FOLLOW UP QUESTIONS ANSWERED": "AI PLAN NEEDS REVIEW",
+		"AI BRAINSTORM":                   "AI FOLLOW UP QUESTIONS",
+		"AI TODO":                         "AI FOLLOW UP QUESTIONS",
+		"AI FOLLOW UP QUESTIONS ANSWERED": "AI BRAINSTORMING DONE",
 		"AI PLAN FEEDBACK":                "AI PLAN NEEDS REVIEW",
 		"AI READY TO IMPLEMENT":           "AI READY TO IMPLEMENT",
 		"AI REVIEWING PR":                 "AI REVIEWING PR",
