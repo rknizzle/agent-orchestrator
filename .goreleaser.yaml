@@ -35,6 +35,7 @@ archives:
       - .env.example
       - README.md
       - note.md
+      - prompts/*
 
 checksum:
   name_template: 'checksums.txt'
