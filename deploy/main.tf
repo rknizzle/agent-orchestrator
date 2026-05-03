@@ -43,9 +43,13 @@ resource "aws_security_group" "orchestrator_sg" {
 
 resource "aws_instance" "orchestrator_server" {
   ami           = data.aws_ami.amazon_linux_2023.id
-  instance_type = "t4g.micro" # Faster, ARM-based Free Tier
+  instance_type = "t4g.small" # 2GB RAM - Free trial for legacy accounts until Dec 2026
 
   vpc_security_group_ids = [aws_security_group.orchestrator_sg.id]
+  
+  # Disable Public IP to avoid the $3.60/month IPv4 charge. 
+  # The orchestrator only needs outgoing internet access (Egress), which is free.
+  associate_public_ip_address = false
 
   # Pass the setup script as User Data
   user_data = templatefile("${path.module}/setup.sh", {
