@@ -6,11 +6,11 @@ TASK BODY:
 {{.Body}}
 {{.RelatedRepoMsg}}
 
-RECENT COMMENTS (May contain brainstorming results or your specific implementation choice):
+RECENT COMMENTS (Including "Technical Context" from previous brainstorming):
 {{.CommentsText}}
 
 INSTRUCTIONS:
-1. USE YOUR TOOLS to explore the local codebase. Search for relevant files, read how the current system works, and determine how this task fits into the existing architecture.
+1. USE YOUR TOOLS to explore the local codebase. Use the "Technical Context" provided in recent comments as a starting point, but verify the state of the code yourself.
 2. DO NOT modify any files yet. Only research and analyze.
 3. CHECK FOR FAST TRACK: If {{.FastTrackMsg}}, and you are 100% confident you understand the fix and it requires minimal changes:
    - IMPLEMENT the code immediately in the current worktree.
