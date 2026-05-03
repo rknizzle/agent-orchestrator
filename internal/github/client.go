@@ -16,17 +16,19 @@ type GitHubClient struct {
 }
 
 type Task struct {
-	ProjectItemID string
-	IssueNodeID   string
-	IssueTitle    string
-	IssueBody     string
-	IssueComments []string
-	IssueLabels   []string
-	IssueURL      string
-	IssueNumber   int
-	RepoName      string
-	CurrentStatus string
-	BranchName    string
+	ProjectItemID    string
+	IssueNodeID      string
+	IssueTitle       string
+	IssueBody        string
+	IssueComments    []string
+	IssueLabels      []string
+	IssueURL         string
+	IssueNumber      int
+	RepoName         string
+	CurrentStatus    string
+	BranchName       string
+	PRReviewDecision string
+	PRReviewComments []string
 }
 
 func NewGitHubClient(token, projectID, statusFieldID string) (*GitHubClient, error) {
@@ -169,6 +171,27 @@ func (c *GitHubClient) GetAllActionableTasks(validStatuses []string) ([]Task, er
 						Repository struct {
 							NameWithOwner string `json:"nameWithOwner"`
 						} `json:"repository"`
+						PullRequests struct {
+							Nodes []struct {
+								ID             string `json:"id"`
+								URL            string `json:"url"`
+								ReviewDecision string `json:"reviewDecision"`
+								Reviews        struct {
+									Nodes []struct {
+										State  string `json:"state"`
+										Body   string `json:"body"`
+										Author *struct {
+											Login string `json:"login"`
+										} `json:"author"`
+										Comments struct {
+											Nodes []struct {
+												Body string `json:"body"`
+											} `json:"nodes"`
+										} `json:"comments"`
+									} `json:"nodes"`
+								} `json:"reviews"`
+							} `json:"nodes"`
+						} `json:"pullRequests"`
 						Labels struct {
 							Nodes []struct {
 								Name string `json:"name"`
@@ -215,6 +238,25 @@ func (c *GitHubClient) GetAllActionableTasks(validStatuses []string) ([]Task, er
                       repository {
                         nameWithOwner
                       }
+                      pullRequests(first: 1, states: [OPEN]) {
+                        nodes {
+                          id
+                          url
+                          reviewDecision
+                          reviews(last: 5) {
+                            nodes {
+                              state
+                              body
+                              author { login }
+                              comments(last: 5) {
+                                nodes {
+                                  body
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
                       labels(first: 10) {
                         nodes {
                           name
@@ -260,6 +302,26 @@ func (c *GitHubClient) GetAllActionableTasks(validStatuses []string) ([]Task, er
 			comments = append(comments, fmt.Sprintf("@%s:\n%s", author, commentNode.Body))
 		}
 
+		// Parse PR Review Info
+		prDecision := ""
+		var prReviewComments []string
+		if len(node.Content.PullRequests.Nodes) > 0 {
+			pr := node.Content.PullRequests.Nodes[0]
+			prDecision = pr.ReviewDecision
+			for _, review := range pr.Reviews.Nodes {
+				if review.Body != "" {
+					author := "Unknown"
+					if review.Author != nil {
+						author = review.Author.Login
+					}
+					prReviewComments = append(prReviewComments, fmt.Sprintf("Review by @%s (%s):\n%s", author, review.State, review.Body))
+				}
+				for _, c := range review.Comments.Nodes {
+					prReviewComments = append(prReviewComments, fmt.Sprintf("PR Comment: %s", c.Body))
+				}
+			}
+		}
+
 		var labels []string
 		for _, labelNode := range node.Content.Labels.Nodes {
 			labels = append(labels, labelNode.Name)
@@ -271,17 +333,19 @@ func (c *GitHubClient) GetAllActionableTasks(validStatuses []string) ([]Task, er
 		}
 
 		actionableTasks = append(actionableTasks, Task{
-			ProjectItemID: node.ID,
-			IssueNodeID:   node.Content.ID,
-			IssueTitle:    node.Content.Title,
-			IssueBody:     node.Content.Body,
-			IssueComments: comments,
-			IssueLabels:   labels,
-			IssueURL:      node.Content.URL,
-			IssueNumber:   node.Content.Number,
-			RepoName:      node.Content.Repository.NameWithOwner,
-			CurrentStatus: node.Status.Name,
-			BranchName:    branchName,
+			ProjectItemID:    node.ID,
+			IssueNodeID:      node.Content.ID,
+			IssueTitle:       node.Content.Title,
+			IssueBody:        node.Content.Body,
+			IssueComments:    comments,
+			IssueLabels:      labels,
+			IssueURL:         node.Content.URL,
+			IssueNumber:      node.Content.Number,
+			RepoName:         node.Content.Repository.NameWithOwner,
+			CurrentStatus:    node.Status.Name,
+			BranchName:       branchName,
+			PRReviewDecision: prDecision,
+			PRReviewComments: prReviewComments,
 		})
 	}
 

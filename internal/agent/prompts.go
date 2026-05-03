@@ -10,11 +10,12 @@ import (
 )
 
 type PromptData struct {
-	Title          string
-	Body           string
-	CommentsText   string
-	RelatedRepoMsg string
-	FastTrackMsg   string
+	Title            string
+	Body             string
+	CommentsText     string
+	RelatedRepoMsg   string
+	FastTrackMsg     string
+	PRReviewComments string
 }
 
 func GetPromptForStatus(targetStatus string, task map[string]interface{}) string {
@@ -49,12 +50,18 @@ func GetPromptForStatus(targetStatus string, task map[string]interface{}) string
 		fastTrackMsg = "the requirements are clear and the task is marked as simple (the \"ai-simple\" label is present)"
 	}
 
+	prReviewComments := "No PR review feedback found yet."
+	if raw, ok := task["pr_review_comments"].([]string); ok && len(raw) > 0 {
+		prReviewComments = strings.Join(raw, "\n\n")
+	}
+
 	data := PromptData{
-		Title:          title,
-		Body:           body,
-		CommentsText:   commentsText,
-		RelatedRepoMsg: relatedRepoMsg,
-		FastTrackMsg:   fastTrackMsg,
+		Title:            title,
+		Body:             body,
+		CommentsText:     commentsText,
+		RelatedRepoMsg:   relatedRepoMsg,
+		FastTrackMsg:     fastTrackMsg,
+		PRReviewComments: prReviewComments,
 	}
 
 	fileName := ""

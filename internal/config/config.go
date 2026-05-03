@@ -11,9 +11,10 @@ import (
 )
 
 type ProjectConfig struct {
-	GithubProjectID     string `yaml:"GITHUB_PROJECT_ID"`
-	GithubStatusFieldID string `yaml:"GITHUB_STATUS_FIELD_ID"`
-	OrchestratorAgent   string `yaml:"ORCHESTRATOR_AGENT"`
+	GithubProjectID     string   `yaml:"GITHUB_PROJECT_ID"`
+	GithubStatusFieldID string   `yaml:"GITHUB_STATUS_FIELD_ID"`
+	OrchestratorAgent   string   `yaml:"ORCHESTRATOR_AGENT"`
+	DisableAIReview     bool     `yaml:"DISABLE_AI_REVIEW"`
 	Includes            []string `yaml:"includes"`
 }
 
@@ -22,6 +23,7 @@ type GlobalConfig struct {
 	GithubProjectID     string                   `yaml:"GITHUB_PROJECT_ID"`
 	GithubStatusFieldID string                   `yaml:"GITHUB_STATUS_FIELD_ID"`
 	OrchestratorAgent   string                   `yaml:"ORCHESTRATOR_AGENT"`
+	DisableAIReview     bool                     `yaml:"DISABLE_AI_REVIEW"`
 	Includes            []string                 `yaml:"includes"`
 	Projects            map[string]ProjectConfig `yaml:"projects"`
 }
@@ -31,6 +33,7 @@ type Config struct {
 	GithubProjectID     string
 	GithubStatusFieldID string
 	OrchestratorAgent   string
+	DisableAIReview     bool
 	Includes            []string
 	RepoPath            string
 	RepoIdentity        string
@@ -94,6 +97,9 @@ func (c *Config) loadConfig() (*Config, error) {
 				if os.Getenv("ORCHESTRATOR_AGENT") == "" && global.OrchestratorAgent != "" {
 					c.OrchestratorAgent = global.OrchestratorAgent
 				}
+				if global.DisableAIReview {
+					c.DisableAIReview = true
+				}
 				c.Includes = append(c.Includes, global.Includes...)
 
 				// Project specific from global
@@ -107,6 +113,9 @@ func (c *Config) loadConfig() (*Config, error) {
 						}
 						if proj.OrchestratorAgent != "" {
 							c.OrchestratorAgent = proj.OrchestratorAgent
+						}
+						if proj.DisableAIReview {
+							c.DisableAIReview = true
 						}
 						c.Includes = append(c.Includes, proj.Includes...)
 					}
@@ -130,6 +139,9 @@ func (c *Config) loadConfig() (*Config, error) {
 				}
 				if local.OrchestratorAgent != "" {
 					c.OrchestratorAgent = local.OrchestratorAgent
+				}
+				if local.DisableAIReview {
+					c.DisableAIReview = true
 				}
 			}
 		}

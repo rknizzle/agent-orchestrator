@@ -121,6 +121,22 @@ func (o *Orchestrator) poll() {
 			continue
 		}
 
+		// Passive Review Logic:
+		// If AI reviewing is disabled and we are in the 'REVIEWING' state, 
+		// we just "watch" the PR for feedback.
+		if cfg.DisableAIReview && task.CurrentStatus == "AI REVIEWING PR" {
+			hasFeedback := task.PRReviewDecision == "CHANGES_REQUESTED" || len(task.PRReviewComments) > 0
+			if hasFeedback {
+				fmt.Printf("[#%d] [*] Feedback detected on PR. Transitioning to AI PR REVIEW FEEDBACK...\n", task.IssueNumber)
+				// Self-transition so the worker picks it up as a fix-it task
+				ghClient.UpdateItemStatus(task.ProjectItemID, "AI PR REVIEW FEEDBACK")
+				task.CurrentStatus = "AI PR REVIEW FEEDBACK"
+			} else {
+				// No feedback yet, keep waiting
+				continue
+			}
+		}
+
 		foundAny = true
 		o.activeTasks[task.IssueNumber] = true
 		go o.worker(task, task.CurrentStatus, ghClient, agentType, cfg.Includes)
@@ -154,12 +170,13 @@ func (o *Orchestrator) worker(task github.Task, targetStatus string, ghClient *g
 	defer git.CleanupWorktree(o.repoPath, worktreePath)
 
 	taskMap := map[string]interface{}{
-		"issue_title":    task.IssueTitle,
-		"issue_body":     task.IssueBody,
-		"issue_comments": task.IssueComments,
-		"issue_labels":   task.IssueLabels,
-		"issue_number":   task.IssueNumber,
-		"repo_name":      task.RepoName,
+		"issue_title":        task.IssueTitle,
+		"issue_body":         task.IssueBody,
+		"issue_comments":     task.IssueComments,
+		"issue_labels":       task.IssueLabels,
+		"issue_number":       task.IssueNumber,
+		"repo_name":          task.RepoName,
+		"pr_review_comments": task.PRReviewComments,
 	}
 
 	nextStatus, agentComment, err := agent.ProcessTask(targetStatus, taskMap, agentType, worktreePath, prefix)
