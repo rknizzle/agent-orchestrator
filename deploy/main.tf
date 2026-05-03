@@ -18,13 +18,13 @@ variable "github_token" {
   sensitive   = true
 }
 
-# Find the latest Amazon Linux 2023 AMI
+# Find the latest Amazon Linux 2023 AMI for ARM64
 data "aws_ami" "amazon_linux_2023" {
   most_recent = true
   owners      = ["amazon"]
   filter {
     name   = "name"
-    values = ["al2023-ami-2023*-x86_64"]
+    values = ["al2023-ami-2023*-arm64"]
   }
 }
 
@@ -43,7 +43,7 @@ resource "aws_security_group" "orchestrator_sg" {
 
 resource "aws_instance" "orchestrator_server" {
   ami           = data.aws_ami.amazon_linux_2023.id
-  instance_type = "t2.micro" # Free Tier
+  instance_type = "t4g.micro" # Faster, ARM-based Free Tier
 
   vpc_security_group_ids = [aws_security_group.orchestrator_sg.id]
 

@@ -19,11 +19,11 @@ swapon /swapfile
 echo '/swapfile swap swap defaults 0 0' >> /etc/fstab
 
 # 4. Install the Orchestrator Binary
-# We pull the latest version directly from your GitHub Releases
+# We pull the latest version directly from your GitHub Releases (ARM64 for t4g.micro)
 mkdir -p /opt/orchestrator
 cd /opt/orchestrator
 # Note: Replace 'your-username' with your actual GitHub username below
-LATEST_URL=$(curl -s https://api.github.com/repos/rknizzle/agent-orchestrator/releases/latest | grep "browser_download_url.*Linux_x86_64.tar.gz" | cut -d '"' -f 4)
+LATEST_URL=$(curl -s https://api.github.com/repos/rknizzle/agent-orchestrator/releases/latest | grep "browser_download_url.*Linux_arm64.tar.gz" | cut -d '"' -f 4)
 curl -L $LATEST_URL | tar xz
 
 # 5. Setup Configuration
