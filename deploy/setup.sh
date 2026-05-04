@@ -71,3 +71,29 @@ EOF
 systemctl daemon-reload
 systemctl enable orchestrator
 systemctl start orchestrator
+
+# 10. Install CloudWatch Agent
+dnf install -y amazon-cloudwatch-agent
+
+# 11. Create CloudWatch Config
+cat <<EOF > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+{
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/messages",
+            "log_group_name": "agent-orchestrator",
+            "log_stream_name": "{instance_id}",
+            "retention_in_days": 7
+          }
+        ]
+      }
+    }
+  }
+}
+EOF
+
+# 12. Start the Agent
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
