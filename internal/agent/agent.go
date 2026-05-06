@@ -74,6 +74,35 @@ func ParseAgentResponse(outputText, defaultState, prefix string) (string, string
 	return nextState, cleanComment, success
 }
 
+func CreateContextFile(taskMap map[string]interface{}, path string) error {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("# Issue Context: %v\n\n", taskMap["issue_title"]))
+	sb.WriteString("## Description\n")
+	sb.WriteString(fmt.Sprintf("%v\n\n", taskMap["issue_body"]))
+
+	if comments, ok := taskMap["issue_comments"].([]string); ok && len(comments) > 0 {
+		sb.WriteString("## Comments\n")
+		for _, c := range comments {
+			sb.WriteString(fmt.Sprintf("%s\n\n---\n\n", c))
+		}
+	}
+
+	if labels, ok := taskMap["issue_labels"].([]string); ok && len(labels) > 0 {
+		sb.WriteString("## Labels\n")
+		sb.WriteString(strings.Join(labels, ", "))
+		sb.WriteString("\n\n")
+	}
+
+	if prComments, ok := taskMap["pr_review_comments"].([]string); ok && len(prComments) > 0 {
+		sb.WriteString("## PR Review Comments\n")
+		for _, c := range prComments {
+			sb.WriteString(fmt.Sprintf("%s\n\n---\n\n", c))
+		}
+	}
+
+	return os.WriteFile(path, []byte(sb.String()), 0644)
+}
+
 func ProcessTask(targetStatus string, task map[string]interface{}, agentType, cwd, prefix string) (string, string, error) {
 	basePrompt := GetPromptForStatus(targetStatus, task)
 	defaultState := GetDefaultStateForStatus(targetStatus)

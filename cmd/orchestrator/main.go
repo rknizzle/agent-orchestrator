@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"sync"
@@ -218,6 +219,75 @@ func (o *Orchestrator) worker(task github.Task, targetStatus string, ghClient *g
 	}
 }
 
+func (o *Orchestrator) RunShell(issueNumber int) {
+	fmt.Printf("[*] Opening interactive shell for issue #%d...\n", issueNumber)
+
+	cfg, err := config.NewConfigManager(o.repoPath)
+	if err != nil {
+		fmt.Printf("[!] Error loading config: %v\n", err)
+		return
+	}
+
+	ghClient, err := github.NewGitHubClient(cfg.GithubToken, cfg.GithubProjectID, cfg.GithubStatusFieldID)
+	if err != nil {
+		fmt.Printf("[!] Failed to initialize GitHub client: %v\n", err)
+		return
+	}
+
+	task, err := ghClient.GetTaskByNumber(issueNumber)
+	if err != nil {
+		fmt.Printf("[!] Failed to fetch task: %v\n", err)
+		return
+	}
+
+	worktreePath, err := git.SetupWorktree(o.repoPath, task.BranchName, cfg.Includes)
+	if err != nil {
+		fmt.Printf("[!] Failed to set up worktree: %v\n", err)
+		return
+	}
+	defer git.CleanupWorktree(o.repoPath, worktreePath)
+
+	taskMap := map[string]interface{}{
+		"issue_title":        task.IssueTitle,
+		"issue_body":         task.IssueBody,
+		"issue_comments":     task.IssueComments,
+		"issue_labels":       task.IssueLabels,
+		"issue_number":       task.IssueNumber,
+		"repo_name":          task.RepoName,
+		"pr_review_comments": task.PRReviewComments,
+	}
+
+	contextFile := filepath.Join(worktreePath, ".context.md")
+	if err := agent.CreateContextFile(taskMap, contextFile); err != nil {
+		fmt.Printf("[!] Failed to create context file: %v\n", err)
+		return
+	}
+
+	fmt.Printf("[*] Context written to %s\n", contextFile)
+	fmt.Printf("[*] Entering sub-shell. Type 'exit' to return to orchestrator.\n")
+
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/bash"
+	}
+
+	cmd := exec.Command(shell)
+	cmd.Dir = worktreePath
+	cmd.Env = append(os.Environ(), 
+		fmt.Sprintf("ORCHESTRATOR_ISSUE_NUMBER=%d", issueNumber),
+		fmt.Sprintf("ORCHESTRATOR_CONTEXT_FILE=%s", contextFile),
+	)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("[!] Shell exited with error: %v\n", err)
+	}
+
+	fmt.Println("[*] Exited shell. Cleaning up...")
+}
+
 func main() {
 	godotenv.Load()
 
@@ -226,6 +296,7 @@ func main() {
 	repoPathFlag := flag.String("repo-path", "", "The local path to the target git repository.")
 	agentFlag := flag.String("agent", "", "The AI agent CLI to use (overrides config).")
 	intervalFlag := flag.Int("interval", 60, "Polling interval in seconds.")
+	shellFlag := flag.Bool("shell", false, "Open an interactive shell with the context of the target issue.")
 
 	flag.Parse()
 
@@ -241,5 +312,14 @@ func main() {
 	}
 
 	orchestrator := NewOrchestrator(repoPath, *statusFlag, *issueFlag, *agentFlag, *intervalFlag)
-	orchestrator.Run()
+
+	if *shellFlag {
+		if *issueFlag == 0 {
+			fmt.Println("[!] Error: --issue is required when using --shell.")
+			os.Exit(1)
+		}
+		orchestrator.RunShell(*issueFlag)
+	} else {
+		orchestrator.Run()
+	}
 }
