@@ -20,14 +20,18 @@ func SetupWorktree(repoPath, branchName string, extraPatterns []string) (string,
 		return worktreePath, nil
 	}
 
-	// Check if branch exists
-	cmd := exec.Command("git", "rev-parse", "--verify", branchName)
-	cmd.Dir = repoPath
-	err := cmd.Run()
-	branchExists := err == nil
-
 	fmt.Println("[*] Fetching latest changes from origin...")
 	exec.Command("git", "fetch", "origin").Run() // Ignore error
+
+	// Check if local branch exists
+	cmd := exec.Command("git", "rev-parse", "--verify", branchName)
+	cmd.Dir = repoPath
+	localExists := cmd.Run() == nil
+
+	// Check if remote branch exists
+	cmdRemote := exec.Command("git", "rev-parse", "--verify", "origin/"+branchName)
+	cmdRemote.Dir = repoPath
+	remoteExists := cmdRemote.Run() == nil
 
 	remoteBase := "origin/main"
 	localDefault := "main"
@@ -41,12 +45,17 @@ func SetupWorktree(repoPath, branchName string, extraPatterns []string) (string,
 	currentBranch := strings.TrimSpace(string(out))
 	if currentBranch == branchName {
 		fmt.Printf("[*] Branch %s is checked out in the main repo. Switching to '%s'...\n", branchName, localDefault)
-		exec.Command("git", "checkout", localDefault).Run()
+		cmdSwitch := exec.Command("git", "checkout", localDefault)
+		cmdSwitch.Dir = repoPath
+		cmdSwitch.Run()
 	}
 
 	fmt.Printf("[*] Creating git worktree at %s for branch %s...\n", worktreePath, branchName)
-	if branchExists {
+	if localExists {
 		cmd = exec.Command("git", "worktree", "add", worktreePath, branchName)
+	} else if remoteExists {
+		fmt.Printf("[*] Checking out remote branch origin/%s...\n", branchName)
+		cmd = exec.Command("git", "worktree", "add", "-b", branchName, worktreePath, "origin/"+branchName)
 	} else {
 		fmt.Printf("[*] Starting new branch from %s...\n", remoteBase)
 		cmd = exec.Command("git", "worktree", "add", "-b", branchName, worktreePath, remoteBase)
