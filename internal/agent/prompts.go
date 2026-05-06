@@ -85,6 +85,8 @@ func GetPromptForStatus(targetStatus string, task map[string]interface{}) string
 		} else {
 			fileName = "todo.md"
 		}
+	case "AI READY TO PLAN":
+		fileName = "plan.md"
 	case "AI PLAN FEEDBACK":
 		fileName = "plan_feedback.md"
 	case "AI READY TO IMPLEMENT":
@@ -141,10 +143,11 @@ func GetDefaultStateForStatus(targetStatus string) string {
 	defaults := map[string]string{
 		"AI BRAINSTORM":                   "AI FOLLOW UP QUESTIONS",
 		"AI TODO":                         "AI FOLLOW UP QUESTIONS",
-		"AI FOLLOW UP QUESTIONS ANSWERED": "AI BRAINSTORMING DONE",
+		"AI FOLLOW UP QUESTIONS ANSWERED": "AI READY TO PLAN",
+		"AI READY TO PLAN":                "AI PLAN NEEDS REVIEW",
 		"AI PLAN FEEDBACK":                "AI PLAN NEEDS REVIEW",
-		"AI READY TO IMPLEMENT":           "AI READY TO IMPLEMENT",
-		"AI REVIEWING PR":                 "AI REVIEWING PR",
+		"AI READY TO IMPLEMENT":           "AI TODO", // Break infinite loop
+		"AI REVIEWING PR":                 "AI PR READY", // Push to human if AI fails
 		"AI PR REVIEW FEEDBACK":           "AI PR READY",
 	}
 	if s, ok := defaults[targetStatus]; ok {

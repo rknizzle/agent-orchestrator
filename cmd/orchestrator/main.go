@@ -123,9 +123,9 @@ func (o *Orchestrator) poll() {
 		}
 
 		// Passive Review Logic:
-		// If AI reviewing is disabled and we are in the 'REVIEWING' state, 
+		// If AI reviewing is disabled and we are in the 'AI PR READY' state, 
 		// we just "watch" the PR for feedback.
-		if cfg.DisableAIReview && task.CurrentStatus == "AI REVIEWING PR" {
+		if cfg.DisableAIReview && task.CurrentStatus == "AI PR READY" {
 			hasFeedback := task.PRReviewDecision == "CHANGES_REQUESTED" || len(task.PRReviewComments) > 0
 			if hasFeedback {
 				fmt.Printf("[#%d] [*] Feedback detected on PR. Transitioning to AI PR REVIEW FEEDBACK...\n", task.IssueNumber)
@@ -140,7 +140,7 @@ func (o *Orchestrator) poll() {
 
 		foundAny = true
 		o.activeTasks[task.IssueNumber] = true
-		go o.worker(task, task.CurrentStatus, ghClient, agentType, cfg.Includes)
+		go o.worker(task, task.CurrentStatus, ghClient, agentType, cfg.Includes, cfg.DisableAIReview)
 	}
 
 	if !foundAny && len(o.activeTasks) == 0 {
@@ -148,7 +148,7 @@ func (o *Orchestrator) poll() {
 	}
 }
 
-func (o *Orchestrator) worker(task github.Task, targetStatus string, ghClient *github.GitHubClient, agentType string, includes []string) {
+func (o *Orchestrator) worker(task github.Task, targetStatus string, ghClient *github.GitHubClient, agentType string, includes []string, disableAIReview bool) {
 	defer func() {
 		o.mu.Lock()
 		delete(o.activeTasks, task.IssueNumber)
@@ -190,12 +190,16 @@ func (o *Orchestrator) worker(task github.Task, targetStatus string, ghClient *g
 	if nextStatus == "AI PR READY" {
 		if targetStatus == "AI PR REVIEW FEEDBACK" {
 			git.PostPRComment(o.repoPath, task.BranchName, fmt.Sprintf("**🤖 Posted by Agent Orchestrator:**\n\n%s", agentComment))
-			nextStatus = "AI REVIEWING PR"
+			if !disableAIReview {
+				nextStatus = "AI REVIEWING PR"
+			}
 		} else {
 			prURL, err := git.CreatePullRequest(o.repoPath, task.IssueTitle, task.IssueNumber, task.BranchName, task.RepoName, agentComment)
 			if err == nil {
 				agentComment += fmt.Sprintf("\n\n**Pull Request:** %s", prURL)
-				nextStatus = "AI REVIEWING PR"
+				if !disableAIReview {
+					nextStatus = "AI REVIEWING PR"
+				}
 			} else {
 				fmt.Printf("%s[!] Failed to create PR: %v\n", prefix, err)
 				agentComment += "\n\n*(Failed to automatically generate Pull Request link. Please check the branch manually.)*"

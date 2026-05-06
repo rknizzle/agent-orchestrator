@@ -19,9 +19,10 @@ INSTRUCTIONS:
    - Wrap a summary of your work in <COMMENT> tags.
    - End your response with: <NEXT_STATE>AI PR READY</NEXT_STATE>
 4. If it is NOT a Fast Track task, but the requirements are clear:
-   - Draft a step-by-step technical implementation plan. Include which files will be modified, what new logic will be added, and any testing considerations.
-   - You MUST wrap your detailed plan exactly in <COMMENT>...</COMMENT> tags so it can be posted for review.
-   - You MUST end your entire response exactly with this tag: <NEXT_STATE>AI PLAN NEEDS REVIEW</NEXT_STATE>
+   - Provide a brief summary of the important context you gathered from the codebase (e.g., file paths, existing functions, data models). This helps future agents.
+   - Note that the requirements are clear and the task is ready for the planning phase.
+   - You MUST wrap your context summary exactly in <COMMENT>...</COMMENT> tags.
+   - You MUST end your entire response exactly with this tag: <NEXT_STATE>AI READY TO PLAN</NEXT_STATE>
 5. If the requirements are ambiguous, or your codebase research reveals missing information, list out your specific follow-up questions for the user.
    - IMPORTANT: Before listing your questions, provide a brief summary of the important context you gathered from the codebase (e.g., file paths, existing functions, data models). This helps future agents pick up where you left off.
    - You MUST wrap your context summary AND your questions exactly in <COMMENT>...</COMMENT> tags.
