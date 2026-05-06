@@ -52,7 +52,7 @@ func NewOrchestrator(repoPath, status string, issue int, agentOverride string, i
 }
 
 func (o *Orchestrator) Run() {
-	fmt.Printf("[*] Starting Parallel GitHub Agent Orchestrator (Go version)\n")
+	fmt.Printf("[*] Starting Parallel GitHub Agent Orchestrator\n")
 	fmt.Printf("[*] Target Repository: %s\n", o.repoPath)
 
 	ticker := time.NewTicker(o.interval)
@@ -189,7 +189,7 @@ func (o *Orchestrator) worker(task github.Task, targetStatus string, ghClient *g
 	// Handle PR creation
 	if nextStatus == "AI PR READY" {
 		if targetStatus == "AI PR REVIEW FEEDBACK" {
-			git.PostPRComment(o.repoPath, task.BranchName, fmt.Sprintf("**🤖 Posted by Agent Orchestrator (Go):**\n\n%s", agentComment))
+			git.PostPRComment(o.repoPath, task.BranchName, fmt.Sprintf("**🤖 Posted by Agent Orchestrator:**\n\n%s", agentComment))
 			nextStatus = "AI REVIEWING PR"
 		} else {
 			prURL, err := git.CreatePullRequest(o.repoPath, task.IssueTitle, task.IssueNumber, task.BranchName, task.RepoName, agentComment)
@@ -206,7 +206,7 @@ func (o *Orchestrator) worker(task github.Task, targetStatus string, ghClient *g
 	fmt.Printf("%s[*] Agent determined next status: '%s'\n", prefix, nextStatus)
 
 	if agentComment != "" {
-		finalComment := fmt.Sprintf("**🤖 Posted by Agent Orchestrator (Go):**\n\n%s", agentComment)
+		finalComment := fmt.Sprintf("**🤖 Posted by Agent Orchestrator:**\n\n%s", agentComment)
 		if _, err := ghClient.PostComment(task.IssueNodeID, finalComment); err != nil {
 			fmt.Printf("%s[!] Failed to post comment: %v\n", prefix, err)
 		}
