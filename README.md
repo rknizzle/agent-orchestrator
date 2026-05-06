@@ -54,6 +54,10 @@ To run it:
 
 ---
 
+## 📖 Documentation
+- **[AI Agent Setup Guide](docs/AGENT_SETUP.md)**: A specialized guide for AI agents to set up this orchestrator for you.
+- **[Interactive Shell Mode (--shell)](docs/shell-mode.md)**: Learn how to jump into a local session with the full context of a specific issue.
+
 ## For Agents: Automatic Setup Guide
 
 If you are an AI agent tasked with setting up this orchestrator for a user, follow these steps:
