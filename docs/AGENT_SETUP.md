@@ -27,36 +27,21 @@ gh api graphql -f query='query{user(login: "YOUR_USER"){projectV2(number: PROJEC
 gh api graphql -f query='query{node(id: "PROJECT_ID"){... on ProjectV2{fields(first:20){nodes{... on ProjectV2SingleSelectField{id name options{name}}}}}}}}'
 ```
 
-#### Programmatically Create Statuses
-Use the `updateProjectV2SingleSelectFieldOptions` mutation to ensure all required statuses exist. 
-**Note**: This mutation replaces the list, so fetch existing options first if you wish to preserve them.
+#### Configure Statuses (Manual Action Required)
+Currently, the GitHub GraphQL API does not support programmatically creating or updating the options within a Single Select field. You **must inform the user** to manually add the following exact options to their Project's "Status" field:
 
-```graphql
-mutation {
-  updateProjectV2SingleSelectFieldOptions(
-    input: {
-      projectId: "PROJECT_ID"
-      fieldId: "FIELD_ID"
-      options: [
-        { name: "AI BRAINSTORM", color: "BLUE" },
-        { name: "AI TODO", color: "GRAY" },
-        { name: "AI WORKING", color: "YELLOW" },
-        { name: "AI FOLLOW UP QUESTIONS", color: "ORANGE" },
-        { name: "AI FOLLOW UP QUESTIONS ANSWERED", color: "GREEN" },
-        { name: "AI READY TO PLAN", color: "BLUE" },
-        { name: "AI PLAN NEEDS REVIEW", color: "PURPLE" },
-        { name: "AI PLAN FEEDBACK", color: "RED" },
-        { name: "AI READY TO IMPLEMENT", color: "GREEN" },
-        { name: "AI PR READY", color: "GREEN" },
-        { name: "AI REVIEWING PR", color: "PURPLE" },
-        { name: "AI PR REVIEW FEEDBACK", color: "RED" }
-      ]
-    }
-  ) {
-    field { ... on ProjectV2SingleSelectField { id } }
-  }
-}
-```
+- `🤖 AI: Brainstorm`
+- `🤖 AI: Triage`
+- `⚙️ PROCESSING (Locked)`
+- `👤 HUMAN: Needs Clarification`
+- `🤖 AI: Review Clarification`
+- `🤖 AI: Draft Plan`
+- `👤 HUMAN: Review Plan`
+- `🤖 AI: Revise Plan`
+- `🤖 AI: Implement`
+- `👤 HUMAN: Review PR`
+- `🤖 AI: Review PR`
+- `🤖 AI: Fix PR Feedback`
 
 ### 3. Initialize Configuration
 Create a `.env` file or a global `~/.orchestrator/config.yaml`. 
@@ -79,6 +64,6 @@ Run a dry run by targeting a specific issue number with zero interval:
 ## 🏗 System Architecture Reference
 
 - **Polling Loop**: Monitors GitHub Projects for tasks with the statuses configured above.
-- **Concurrency**: Immediately sets status to `AI WORKING` to lock tasks.
+- **Concurrency**: Immediately sets status to `⚙️ PROCESSING (Locked)` to lock tasks.
 - **Isolation**: Creates a temporary Git **Worktree** for each task.
 - **State Machine**: Agent output must include `<NEXT_STATE>` (one of the statuses above) and `<COMMENT>`.
