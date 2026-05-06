@@ -171,27 +171,21 @@ func (c *GitHubClient) GetAllActionableTasks(validStatuses []string) ([]Task, er
 						Repository struct {
 							NameWithOwner string `json:"nameWithOwner"`
 						} `json:"repository"`
-						PullRequests struct {
+						ReviewDecision string `json:"reviewDecision"`
+						Reviews        struct {
 							Nodes []struct {
-								ID             string `json:"id"`
-								URL            string `json:"url"`
-								ReviewDecision string `json:"reviewDecision"`
-								Reviews        struct {
+								State  string `json:"state"`
+								Body   string `json:"body"`
+								Author *struct {
+									Login string `json:"login"`
+								} `json:"author"`
+								Comments struct {
 									Nodes []struct {
-										State  string `json:"state"`
-										Body   string `json:"body"`
-										Author *struct {
-											Login string `json:"login"`
-										} `json:"author"`
-										Comments struct {
-											Nodes []struct {
-												Body string `json:"body"`
-											} `json:"nodes"`
-										} `json:"comments"`
+										Body string `json:"body"`
 									} `json:"nodes"`
-								} `json:"reviews"`
+								} `json:"comments"`
 							} `json:"nodes"`
-						} `json:"pullRequests"`
+						} `json:"reviews"`
 						Labels struct {
 							Nodes []struct {
 								Name string `json:"name"`
@@ -238,21 +232,38 @@ func (c *GitHubClient) GetAllActionableTasks(validStatuses []string) ([]Task, er
                       repository {
                         nameWithOwner
                       }
-                      pullRequests(first: 1, states: [OPEN]) {
+                      labels(first: 10) {
                         nodes {
-                          id
-                          url
-                          reviewDecision
-                          reviews(last: 5) {
+                          name
+                        }
+                      }
+                      comments(last: 10) {
+                        nodes {
+                          author {
+                            login
+                          }
+                          body
+                        }
+                      }
+                    }
+                    ... on PullRequest {
+                      id
+                      title
+                      body
+                      url
+                      number
+                      repository {
+                        nameWithOwner
+                      }
+                      reviewDecision
+                      reviews(last: 5) {
+                        nodes {
+                          state
+                          body
+                          author { login }
+                          comments(last: 5) {
                             nodes {
-                              state
                               body
-                              author { login }
-                              comments(last: 5) {
-                                nodes {
-                                  body
-                                }
-                              }
                             }
                           }
                         }
@@ -303,22 +314,18 @@ func (c *GitHubClient) GetAllActionableTasks(validStatuses []string) ([]Task, er
 		}
 
 		// Parse PR Review Info
-		prDecision := ""
+		prDecision := node.Content.ReviewDecision
 		var prReviewComments []string
-		if len(node.Content.PullRequests.Nodes) > 0 {
-			pr := node.Content.PullRequests.Nodes[0]
-			prDecision = pr.ReviewDecision
-			for _, review := range pr.Reviews.Nodes {
-				if review.Body != "" {
-					author := "Unknown"
-					if review.Author != nil {
-						author = review.Author.Login
-					}
-					prReviewComments = append(prReviewComments, fmt.Sprintf("Review by @%s (%s):\n%s", author, review.State, review.Body))
+		for _, review := range node.Content.Reviews.Nodes {
+			if review.Body != "" {
+				author := "Unknown"
+				if review.Author != nil {
+					author = review.Author.Login
 				}
-				for _, c := range review.Comments.Nodes {
-					prReviewComments = append(prReviewComments, fmt.Sprintf("PR Comment: %s", c.Body))
-				}
+				prReviewComments = append(prReviewComments, fmt.Sprintf("Review by @%s (%s):\n%s", author, review.State, review.Body))
+			}
+			for _, c := range review.Comments.Nodes {
+				prReviewComments = append(prReviewComments, fmt.Sprintf("PR Comment: %s", c.Body))
 			}
 		}
 
@@ -375,27 +382,21 @@ func (c *GitHubClient) GetTaskByNumber(issueNumber int) (*Task, error) {
 						Repository struct {
 							NameWithOwner string `json:"nameWithOwner"`
 						} `json:"repository"`
-						PullRequests struct {
+						ReviewDecision string `json:"reviewDecision"`
+						Reviews        struct {
 							Nodes []struct {
-								ID             string `json:"id"`
-								URL            string `json:"url"`
-								ReviewDecision string `json:"reviewDecision"`
-								Reviews        struct {
+								State  string `json:"state"`
+								Body   string `json:"body"`
+								Author *struct {
+									Login string `json:"login"`
+								} `json:"author"`
+								Comments struct {
 									Nodes []struct {
-										State  string `json:"state"`
-										Body   string `json:"body"`
-										Author *struct {
-											Login string `json:"login"`
-										} `json:"author"`
-										Comments struct {
-											Nodes []struct {
-												Body string `json:"body"`
-											} `json:"nodes"`
-										} `json:"comments"`
+										Body string `json:"body"`
 									} `json:"nodes"`
-								} `json:"reviews"`
+								} `json:"comments"`
 							} `json:"nodes"`
-						} `json:"pullRequests"`
+						} `json:"reviews"`
 						Labels struct {
 							Nodes []struct {
 								Name string `json:"name"`
@@ -442,21 +443,38 @@ func (c *GitHubClient) GetTaskByNumber(issueNumber int) (*Task, error) {
                       repository {
                         nameWithOwner
                       }
-                      pullRequests(first: 1, states: [OPEN]) {
+                      labels(first: 10) {
                         nodes {
-                          id
-                          url
-                          reviewDecision
-                          reviews(last: 5) {
+                          name
+                        }
+                      }
+                      comments(last: 10) {
+                        nodes {
+                          author {
+                            login
+                          }
+                          body
+                        }
+                      }
+                    }
+                    ... on PullRequest {
+                      id
+                      title
+                      body
+                      url
+                      number
+                      repository {
+                        nameWithOwner
+                      }
+                      reviewDecision
+                      reviews(last: 5) {
+                        nodes {
+                          state
+                          body
+                          author { login }
+                          comments(last: 5) {
                             nodes {
-                              state
                               body
-                              author { login }
-                              comments(last: 5) {
-                                nodes {
-                                  body
-                                }
-                              }
                             }
                           }
                         }
@@ -497,22 +515,18 @@ func (c *GitHubClient) GetTaskByNumber(issueNumber int) (*Task, error) {
 				comments = append(comments, fmt.Sprintf("@%s:\n%s", author, commentNode.Body))
 			}
 
-			prDecision := ""
+			prDecision := node.Content.ReviewDecision
 			var prReviewComments []string
-			if len(node.Content.PullRequests.Nodes) > 0 {
-				pr := node.Content.PullRequests.Nodes[0]
-				prDecision = pr.ReviewDecision
-				for _, review := range pr.Reviews.Nodes {
-					if review.Body != "" {
-						author := "Unknown"
-						if review.Author != nil {
-							author = review.Author.Login
-						}
-						prReviewComments = append(prReviewComments, fmt.Sprintf("Review by @%s (%s):\n%s", author, review.State, review.Body))
+			for _, review := range node.Content.Reviews.Nodes {
+				if review.Body != "" {
+					author := "Unknown"
+					if review.Author != nil {
+						author = review.Author.Login
 					}
-					for _, c := range review.Comments.Nodes {
-						prReviewComments = append(prReviewComments, fmt.Sprintf("PR Comment: %s", c.Body))
-					}
+					prReviewComments = append(prReviewComments, fmt.Sprintf("Review by @%s (%s):\n%s", author, review.State, review.Body))
+				}
+				for _, c := range review.Comments.Nodes {
+					prReviewComments = append(prReviewComments, fmt.Sprintf("PR Comment: %s", c.Body))
 				}
 			}
 
