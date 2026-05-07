@@ -66,11 +66,11 @@ func GetPromptForStatus(targetStatus string, task map[string]interface{}) string
 
 	fileName := ""
 	switch targetStatus {
-	case "AI BRAINSTORM":
+	case "🤖 AI: Brainstorm":
 		fileName = "brainstorm.md"
-	case "AI TODO":
+	case "🤖 AI: Triage":
 		fileName = "todo.md"
-	case "AI FOLLOW UP QUESTIONS ANSWERED":
+	case "🤖 AI: Review Clarification":
 		// Determine if we came from Brainstorm or Todo
 		isBrainstorm := false
 		for _, comment := range comments {
@@ -85,15 +85,15 @@ func GetPromptForStatus(targetStatus string, task map[string]interface{}) string
 		} else {
 			fileName = "todo.md"
 		}
-	case "AI READY TO PLAN":
+	case "🤖 AI: Draft Plan":
 		fileName = "plan.md"
-	case "AI PLAN FEEDBACK":
+	case "🤖 AI: Revise Plan":
 		fileName = "plan_feedback.md"
-	case "AI READY TO IMPLEMENT":
+	case "🤖 AI: Implement":
 		fileName = "implement.md"
-	case "AI PR REVIEW FEEDBACK":
+	case "🤖 AI: Fix PR Feedback":
 		fileName = "pr_feedback.md"
-	case "AI REVIEWING PR":
+	case "🤖 AI: Review PR":
 		fileName = "review_pr.md"
 	default:
 		return ""
@@ -141,17 +141,17 @@ func executeTemplate(fileName string, data PromptData) string {
 
 func GetDefaultStateForStatus(targetStatus string) string {
 	defaults := map[string]string{
-		"AI BRAINSTORM":                   "AI FOLLOW UP QUESTIONS",
-		"AI TODO":                         "AI FOLLOW UP QUESTIONS",
-		"AI FOLLOW UP QUESTIONS ANSWERED": "AI READY TO PLAN",
-		"AI READY TO PLAN":                "AI PLAN NEEDS REVIEW",
-		"AI PLAN FEEDBACK":                "AI PLAN NEEDS REVIEW",
-		"AI READY TO IMPLEMENT":           "AI TODO", // Break infinite loop
-		"AI REVIEWING PR":                 "AI PR READY", // Push to human if AI fails
-		"AI PR REVIEW FEEDBACK":           "AI PR READY",
+		"🤖 AI: Brainstorm":            "👤 HUMAN: Needs Clarification",
+		"🤖 AI: Triage":                "👤 HUMAN: Needs Clarification",
+		"🤖 AI: Review Clarification":  "🤖 AI: Draft Plan",
+		"🤖 AI: Draft Plan":            "👤 HUMAN: Review Plan",
+		"🤖 AI: Revise Plan":           "👤 HUMAN: Review Plan",
+		"🤖 AI: Implement":             "🤖 AI: Triage", // Break infinite loop
+		"🤖 AI: Review PR":             "👤 HUMAN: Review PR", // Push to human if AI fails
+		"🤖 AI: Fix PR Feedback":       "👤 HUMAN: Review PR",
 	}
 	if s, ok := defaults[targetStatus]; ok {
 		return s
 	}
-	return "AI TODO"
+	return "🤖 AI: Triage"
 }
