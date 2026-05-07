@@ -17,6 +17,6 @@ INSTRUCTIONS:
    - A testing strategy (which existing tests to run or new tests to write).
    - Any potential risks or architectural trade-offs.
 4. You MUST wrap your detailed plan exactly in <COMMENT>...</COMMENT> tags so it can be posted for review by the lead engineer.
-5. You MUST end your entire response exactly with this tag: <NEXT_STATE>AI PLAN NEEDS REVIEW</NEXT_STATE>
+5. You MUST end your entire response exactly with this tag: <NEXT_STATE>👤 HUMAN: Review Plan</NEXT_STATE>
 
 Remember: Only the text inside <COMMENT>...</COMMENT> will be shown to the user. Use the rest of your output space to think and research.

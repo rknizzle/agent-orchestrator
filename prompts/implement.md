@@ -16,4 +16,4 @@ INSTRUCTIONS:
 4. Push the branch to the remote repository.
 5. Write a summary of the completed work. This summary will be used as the Pull Request description, so make it informative (e.g., mention what was fixed, any testing done, and any notable design decisions).
    - You MUST wrap this summary exactly in <COMMENT>...</COMMENT> tags.
-   - You MUST end your entire response exactly with this tag: <NEXT_STATE>AI PR READY</NEXT_STATE>
+   - You MUST end your entire response exactly with this tag: <NEXT_STATE>👤 HUMAN: Review PR</NEXT_STATE>

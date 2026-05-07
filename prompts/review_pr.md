@@ -17,8 +17,8 @@ INSTRUCTIONS:
 5. If you find ANY issues (bugs, missing tests, code style violations, or requirements not met):
    - List your feedback clearly.
    - Wrap your feedback in <COMMENT>...</COMMENT> tags.
-   - End your response with: <NEXT_STATE>AI PR REVIEW FEEDBACK</NEXT_STATE>
+   - End your response with: <NEXT_STATE>🤖 AI: Fix PR Feedback</NEXT_STATE>
 6. If the PR is perfect and you are ready for a human to merge it:
    - Provide a brief "LGTM" (Looks Good To Me) summary.
    - Wrap your summary in <COMMENT>...</COMMENT> tags.
-   - End your response with: <NEXT_STATE>AI PR READY</NEXT_STATE>
+   - End your response with: <NEXT_STATE>👤 HUMAN: Review PR</NEXT_STATE>

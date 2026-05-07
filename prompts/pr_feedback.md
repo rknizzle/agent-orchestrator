@@ -18,4 +18,4 @@ INSTRUCTIONS:
 3. Commit and push the updated code to the PR branch.
 4. Write a summary of how you addressed the feedback. This summary will be appended to the PR, so make it informative.
    - You MUST wrap this summary exactly in <COMMENT>...</COMMENT> tags.
-   - You MUST end your entire response exactly with this tag: <NEXT_STATE>AI PR READY</NEXT_STATE>
+   - You MUST end your entire response exactly with this tag: <NEXT_STATE>👤 HUMAN: Review PR</NEXT_STATE>
