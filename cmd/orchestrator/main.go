@@ -19,16 +19,18 @@ import (
 )
 
 var VALID_STATUSES = []string{
-	"AI BRAINSTORM",
-	"AI TODO",
-	"AI FOLLOW UP QUESTIONS ANSWERED",
-	"AI PLAN FEEDBACK",
-	"AI READY TO IMPLEMENT",
-	"AI REVIEWING PR",
-	"AI PR REVIEW FEEDBACK",
+	"🤖 AI: Brainstorm",
+	"🤖 AI: Triage",
+	"🤖 AI: Review Clarification",
+	"🤖 AI: Draft Plan",
+	"🤖 AI: Revise Plan",
+	"🤖 AI: Implement",
+	"👤 HUMAN: Review PR",
+	"🤖 AI: Review PR",
+	"🤖 AI: Fix PR Feedback",
 }
 
-const LOCKED_STATUS = "AI WORKING"
+const LOCKED_STATUS = "⚙️ PROCESSING (Locked)"
 
 type Orchestrator struct {
 	repoPath     string
@@ -123,15 +125,15 @@ func (o *Orchestrator) poll() {
 		}
 
 		// Passive Review Logic:
-		// If AI reviewing is disabled and we are in the 'AI PR READY' state, 
+		// If AI reviewing is disabled and we are in the '👤 HUMAN: Review PR' state, 
 		// we just "watch" the PR for feedback.
-		if cfg.DisableAIReview && task.CurrentStatus == "AI PR READY" {
+		if cfg.DisableAIReview && task.CurrentStatus == "👤 HUMAN: Review PR" {
 			hasFeedback := task.PRReviewDecision == "CHANGES_REQUESTED" || len(task.PRReviewComments) > 0
 			if hasFeedback {
-				fmt.Printf("[#%d] [*] Feedback detected on PR. Transitioning to AI PR REVIEW FEEDBACK...\n", task.IssueNumber)
+				fmt.Printf("[#%d] [*] Feedback detected on PR. Transitioning to 🤖 AI: Fix PR Feedback...\n", task.IssueNumber)
 				// Self-transition so the worker picks it up as a fix-it task
-				ghClient.UpdateItemStatus(task.ProjectItemID, "AI PR REVIEW FEEDBACK")
-				task.CurrentStatus = "AI PR REVIEW FEEDBACK"
+				ghClient.UpdateItemStatus(task.ProjectItemID, "🤖 AI: Fix PR Feedback")
+				task.CurrentStatus = "🤖 AI: Fix PR Feedback"
 			} else {
 				// No feedback yet, keep waiting
 				continue
@@ -140,7 +142,7 @@ func (o *Orchestrator) poll() {
 
 		foundAny = true
 		o.activeTasks[task.IssueNumber] = true
-		go o.worker(task, task.CurrentStatus, ghClient, agentType, cfg.Includes, cfg.DisableAIReview)
+		go o.worker(task, task.CurrentStatus, ghClient, agentType, cfg.Models, cfg.Includes, cfg.DisableAIReview)
 	}
 
 	if !foundAny && len(o.activeTasks) == 0 {
@@ -148,7 +150,7 @@ func (o *Orchestrator) poll() {
 	}
 }
 
-func (o *Orchestrator) worker(task github.Task, targetStatus string, ghClient *github.GitHubClient, agentType string, includes []string, disableAIReview bool) {
+func (o *Orchestrator) worker(task github.Task, targetStatus string, ghClient *github.GitHubClient, agentType string, models map[string]string, includes []string, disableAIReview bool) {
 	defer func() {
 		o.mu.Lock()
 		delete(o.activeTasks, task.IssueNumber)
@@ -180,25 +182,34 @@ func (o *Orchestrator) worker(task github.Task, targetStatus string, ghClient *g
 		"pr_review_comments": task.PRReviewComments,
 	}
 
-	nextStatus, agentComment, err := agent.ProcessTask(targetStatus, taskMap, agentType, worktreePath, prefix)
+	model := ""
+	if models != nil {
+		if m, ok := models[targetStatus]; ok {
+			model = m
+		} else if m, ok := models["default"]; ok {
+			model = m
+		}
+	}
+
+	nextStatus, agentComment, err := agent.ProcessTask(targetStatus, taskMap, agentType, model, worktreePath, prefix)
 	if err != nil {
 		fmt.Printf("%s[!] Agent process failed: %v\n", prefix, err)
 		return
 	}
 
 	// Handle PR creation
-	if nextStatus == "AI PR READY" {
-		if targetStatus == "AI PR REVIEW FEEDBACK" {
+	if nextStatus == "👤 HUMAN: Review PR" {
+		if targetStatus == "🤖 AI: Fix PR Feedback" {
 			git.PostPRComment(o.repoPath, task.BranchName, fmt.Sprintf("**🤖 Posted by Agent Orchestrator:**\n\n%s", agentComment))
 			if !disableAIReview {
-				nextStatus = "AI REVIEWING PR"
+				nextStatus = "🤖 AI: Review PR"
 			}
 		} else {
 			prURL, err := git.CreatePullRequest(o.repoPath, task.IssueTitle, task.IssueNumber, task.BranchName, task.RepoName, agentComment)
 			if err == nil {
 				agentComment += fmt.Sprintf("\n\n**Pull Request:** %s", prURL)
 				if !disableAIReview {
-					nextStatus = "AI REVIEWING PR"
+					nextStatus = "🤖 AI: Review PR"
 				}
 			} else {
 				fmt.Printf("%s[!] Failed to create PR: %v\n", prefix, err)

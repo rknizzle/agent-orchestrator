@@ -22,16 +22,22 @@ ORCHESTRATOR_AGENT=gemini
 ```
 
 #### Global Configuration
-You can also use a global config file at `~/.orchestrator/config.yaml`:
+You can also use a global config file at `~/.orchestrator/config.yaml`. This allows you to set global defaults and project-specific overrides, including specifying which AI model to use for each phase:
 ```yaml
 GITHUB_TOKEN: "your_pat_here"
 GITHUB_PROJECT_ID: "your_project_id_here"
 GITHUB_STATUS_FIELD_ID: "your_status_field_id_here"
 ORCHESTRATOR_AGENT: "gemini"
+models:
+  default: "gemini-2.5-flash"
+  "🤖 AI: Triage": "gemini-2.5-flash"
+  "🤖 AI: Implement": "gemini-2.5-pro"
 projects:
   owner/repo:
     GITHUB_PROJECT_ID: "repo_specific_project_id"
     GITHUB_STATUS_FIELD_ID: "repo_specific_field_id"
+    models:
+      "🤖 AI: Implement": "claude-3-5-sonnet"
 ```
 
 ### 3. Building and Running

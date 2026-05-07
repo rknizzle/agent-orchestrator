@@ -11,11 +11,12 @@ import (
 )
 
 type ProjectConfig struct {
-	GithubProjectID     string   `yaml:"GITHUB_PROJECT_ID"`
-	GithubStatusFieldID string   `yaml:"GITHUB_STATUS_FIELD_ID"`
-	OrchestratorAgent   string   `yaml:"ORCHESTRATOR_AGENT"`
-	DisableAIReview     bool     `yaml:"DISABLE_AI_REVIEW"`
-	Includes            []string `yaml:"includes"`
+	GithubProjectID     string            `yaml:"GITHUB_PROJECT_ID"`
+	GithubStatusFieldID string            `yaml:"GITHUB_STATUS_FIELD_ID"`
+	OrchestratorAgent   string            `yaml:"ORCHESTRATOR_AGENT"`
+	DisableAIReview     bool              `yaml:"DISABLE_AI_REVIEW"`
+	Models              map[string]string `yaml:"models"`
+	Includes            []string          `yaml:"includes"`
 }
 
 type GlobalConfig struct {
@@ -24,6 +25,7 @@ type GlobalConfig struct {
 	GithubStatusFieldID string                   `yaml:"GITHUB_STATUS_FIELD_ID"`
 	OrchestratorAgent   string                   `yaml:"ORCHESTRATOR_AGENT"`
 	DisableAIReview     bool                     `yaml:"DISABLE_AI_REVIEW"`
+	Models              map[string]string        `yaml:"models"`
 	Includes            []string                 `yaml:"includes"`
 	Projects            map[string]ProjectConfig `yaml:"projects"`
 }
@@ -34,6 +36,7 @@ type Config struct {
 	GithubStatusFieldID string
 	OrchestratorAgent   string
 	DisableAIReview     bool
+	Models              map[string]string
 	Includes            []string
 	RepoPath            string
 	RepoIdentity        string
@@ -100,6 +103,12 @@ func (c *Config) loadConfig() (*Config, error) {
 				if global.DisableAIReview {
 					c.DisableAIReview = true
 				}
+				if global.Models != nil {
+					c.Models = make(map[string]string)
+					for k, v := range global.Models {
+						c.Models[k] = v
+					}
+				}
 				c.Includes = append(c.Includes, global.Includes...)
 
 				// Project specific from global
@@ -116,6 +125,14 @@ func (c *Config) loadConfig() (*Config, error) {
 						}
 						if proj.DisableAIReview {
 							c.DisableAIReview = true
+						}
+						if proj.Models != nil {
+							if c.Models == nil {
+								c.Models = make(map[string]string)
+							}
+							for k, v := range proj.Models {
+								c.Models[k] = v
+							}
 						}
 						c.Includes = append(c.Includes, proj.Includes...)
 					}
@@ -142,6 +159,14 @@ func (c *Config) loadConfig() (*Config, error) {
 				}
 				if local.DisableAIReview {
 					c.DisableAIReview = true
+				}
+				if local.Models != nil {
+					if c.Models == nil {
+						c.Models = make(map[string]string)
+					}
+					for k, v := range local.Models {
+						c.Models[k] = v
+					}
 				}
 			}
 		}

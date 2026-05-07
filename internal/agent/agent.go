@@ -9,12 +9,16 @@ import (
 	"strings"
 )
 
-func RunAgentCLI(agentType, prompt, cwd, prefix string) (string, error) {
+func RunAgentCLI(agentType, prompt, model, cwd, prefix string) (string, error) {
 	displayType := agentType
 	if len(agentType) > 0 {
 		displayType = strings.ToUpper(agentType[:1]) + agentType[1:]
 	}
-	fmt.Printf("%s[*] Invoking %s CLI... (cwd: %s)\n", prefix, displayType, cwd)
+	if model != "" {
+		fmt.Printf("%s[*] Invoking %s CLI (Model: %s)... (cwd: %s)\n", prefix, displayType, model, cwd)
+	} else {
+		fmt.Printf("%s[*] Invoking %s CLI... (cwd: %s)\n", prefix, displayType, cwd)
+	}
 
 	executablePath, _ := os.Executable()
 	policyPath := filepath.Join(filepath.Dir(executablePath), "orchestrator-policy.yaml")
@@ -26,11 +30,25 @@ func RunAgentCLI(agentType, prompt, cwd, prefix string) (string, error) {
 	var cmd *exec.Cmd
 	switch agentType {
 	case "gemini":
-		cmd = exec.Command("gemini", "-p", prompt, "--model", "auto", "--yolo", "--policy", policyPath)
+		if model == "" {
+			model = "auto"
+		}
+		cmd = exec.Command("gemini", "-p", prompt, "--model", model, "--yolo", "--policy", policyPath)
 	case "claude":
-		cmd = exec.Command("claude", "-p", prompt, "--bare", "--allowedTools", "Bash,Read,Edit")
+		args := []string{"-p", prompt, "--bare", "--allowedTools", "Bash,Read,Edit"}
+		if model != "" {
+			// Claude CLI might not explicitly support --model, but passing it if supported.
+			// (If it doesn't support it, this might break, so we should append if model is given)
+			// Assuming standard Claude CLI usage or mapping
+			args = append(args, "--model", model)
+		}
+		cmd = exec.Command("claude", args...)
 	case "cursor-agent", "agent":
-		cmd = exec.Command(agentType, "-p", prompt, "--yolo")
+		args := []string{"-p", prompt, "--yolo"}
+		if model != "" {
+			args = append(args, "-m", model)
+		}
+		cmd = exec.Command(agentType, args...)
 	default:
 		return "", fmt.Errorf("unknown agent type: %s", agentType)
 	}
@@ -103,7 +121,7 @@ func CreateContextFile(taskMap map[string]interface{}, path string) error {
 	return os.WriteFile(path, []byte(sb.String()), 0644)
 }
 
-func ProcessTask(targetStatus string, task map[string]interface{}, agentType, cwd, prefix string) (string, string, error) {
+func ProcessTask(targetStatus string, task map[string]interface{}, agentType, model, cwd, prefix string) (string, string, error) {
 	basePrompt := GetPromptForStatus(targetStatus, task)
 	defaultState := GetDefaultStateForStatus(targetStatus)
 
@@ -115,7 +133,7 @@ func ProcessTask(targetStatus string, task map[string]interface{}, agentType, cw
 			fmt.Printf("%s[*] Retry Attempt %d/%d due to missing tags...\n", prefix, attempt, maxRetries)
 		}
 
-		output, err := RunAgentCLI(agentType, currentPrompt, cwd, prefix)
+		output, err := RunAgentCLI(agentType, currentPrompt, model, cwd, prefix)
 		if err != nil {
 			return "", "", err
 		}
